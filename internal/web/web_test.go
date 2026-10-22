@@ -466,6 +466,35 @@ func TestQuestionPageFallsBackToTheMyanmarText(t *testing.T) {
 	}
 }
 
+func TestLoginFormCanRevealThePassword(t *testing.T) {
+	srv := newTestServer(t)
+	client := newClient(t, srv.URL)
+
+	status, body := client.get("/login")
+	if status != http.StatusOK {
+		t.Fatalf("GET /login returned %d, want 200", status)
+	}
+	if !strings.Contains(body, `id="password"`) {
+		t.Error("the password field has no id, so the Show button cannot find it")
+	}
+	if !strings.Contains(body, `data-toggle-password="password"`) {
+		t.Error("the login form has no Show button for the password")
+	}
+
+	status, body = client.get("/register")
+	if status != http.StatusOK {
+		t.Fatalf("GET /register returned %d, want 200", status)
+	}
+	for _, id := range []string{"password", "password_confirmation"} {
+		if !strings.Contains(body, `id="`+id+`"`) {
+			t.Errorf("the field %q has no id, so the Show button cannot find it", id)
+		}
+		if !strings.Contains(body, `data-toggle-password="`+id+`"`) {
+			t.Errorf("the field %q has no Show button", id)
+		}
+	}
+}
+
 func TestSubmissionRequiresEveryAnswer(t *testing.T) {
 	srv := newTestServer(t)
 	srv.createRootAdmin(t, "root", "RootPass123")

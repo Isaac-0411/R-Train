@@ -18,7 +18,7 @@ managed by administrators in the browser.
 | 1 | `/login`, `/register` | A visitor signs in or creates a normal account. |
 | 2 | `/` | The landing page shows one button per lesson. |
 | 3 | `/lessons/{id}` | The **Myanmar language page**: the Myanmar text of the lesson in a box and a **Next** button. |
-| 4 | `/lessons/{id}/quiz` | The **question page**: the big text box with the Japanese text of the lesson stands on top, one question per card is shown below it. Arrow buttons move from question to question, the text box stays in place. The **Submit** button sits in the bottom right corner. |
+| 4 | `/lessons/{id}/quiz` | The **question page**: the big text box with the Japanese text of the lesson stands on top, one question per card is shown below it. Arrow buttons move from question to question, the page scrolls normally with the content. The **Submit** button sits in the bottom right corner. |
 | 5 | `/results/{id}` | The **result page**: the score such as `4 / 20`, the answers and a **Home** button back to the landing page. |
 
 Every lesson has **two texts** and they are written by hand:

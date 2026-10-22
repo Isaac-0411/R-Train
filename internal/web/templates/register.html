@@ -32,8 +32,9 @@
       <label class="field">
         <span class="field-label">Password</span>
         <span class="input-with-button">
-          <input type="password" name="password" autocomplete="new-password" minlength="8" maxlength="128" required>
-          <button type="button" class="btn btn-ghost btn-small" data-toggle-password="password">Show</button>
+          <input type="password" name="password" id="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+          <button type="button" class="btn btn-ghost btn-small" data-toggle-password="password"
+                  aria-controls="password" aria-pressed="false">Show</button>
         </span>
         <span class="field-hint">At least 8 characters.</span>
         {{if .Errors}}<span class="field-error">{{.Errors.Field "password"}}</span>{{end}}
@@ -41,7 +42,11 @@
 
       <label class="field">
         <span class="field-label">Confirm password</span>
-        <input type="password" name="password_confirmation" autocomplete="new-password" minlength="8" maxlength="128" required>
+        <span class="input-with-button">
+          <input type="password" name="password_confirmation" id="password_confirmation" autocomplete="new-password" minlength="8" maxlength="128" required>
+          <button type="button" class="btn btn-ghost btn-small" data-toggle-password="password_confirmation"
+                  aria-controls="password_confirmation" aria-pressed="false">Show</button>
+        </span>
         {{if .Errors}}<span class="field-error">{{.Errors.Field "password_confirmation"}}</span>{{end}}
       </label>
 

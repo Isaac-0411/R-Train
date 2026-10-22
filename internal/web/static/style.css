@@ -79,7 +79,7 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 4.5rem; }
 
 body {
   margin: 0;
@@ -147,9 +147,9 @@ a:hover { text-decoration: underline; }
   border-radius: 10px;
   background: var(--primary);
   color: var(--on-primary);
-  font-family: var(--font-myanmar);
-  font-size: 1.05rem;
 }
+
+.brand-cat { display: block; width: 1.35rem; height: 1.35rem; }
 
 .nav {
   display: flex;
@@ -443,8 +443,6 @@ input:disabled, select:disabled { opacity: .6; cursor: not-allowed; }
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 1.1rem 1.25rem;
-  max-height: 60vh;
-  overflow-y: auto;
 }
 
 /* The text of the question page is written in Japanese. */
@@ -458,8 +456,9 @@ input:disabled, select:disabled { opacity: .6; cursor: not-allowed; }
 
 /* --- quiz --------------------------------------------------------------- */
 
-/* The text box is big and stays on top, the single question of the box
-   is shown below it. */
+/* The text box is big and stands on top of the page, the single question of
+   the box follows below it. Both grow with their content, so the page is the
+   only thing that scrolls. */
 .quiz-layout {
   display: grid;
   gap: 1.25rem;
@@ -467,16 +466,13 @@ input:disabled, select:disabled { opacity: .6; cursor: not-allowed; }
   align-items: start;
 }
 
-.passage-panel {
-  position: sticky;
-  top: 4.25rem;
-  z-index: 1;
-}
 .passage-panel .passage {
-  min-height: 15rem;
-  max-height: min(46vh, calc(100vh - 15rem));
+  min-height: 12rem;
   font-size: 1.2rem;
 }
+
+/* The cards of the quiz sit in a grid, so the card margin is not needed. */
+.quiz-layout > .card { margin-bottom: 0; }
 
 .questions-panel { display: flex; flex-direction: column; }
 
@@ -668,9 +664,7 @@ input:disabled, select:disabled { opacity: .6; cursor: not-allowed; }
 /* --- responsive --------------------------------------------------------- */
 
 @media (max-width: 900px) {
-  .quiz-layout { grid-template-columns: 1fr; }
-  .passage-panel { position: static; }
-  .passage-panel .passage { max-height: 40vh; font-size: 1.1rem; }
+  .passage-panel .passage { font-size: 1.1rem; }
   .two-column-wide { grid-template-columns: 1fr; }
 }
 

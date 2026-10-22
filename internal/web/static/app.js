@@ -21,20 +21,19 @@
     var hint = document.getElementById("quizHint");
     var current = 0;
 
-    // The text box stays on top of the page, so a question is scrolled to
-    // the place below that box.
-    function scrollToBox(box) {
+    // The arrow buttons move through the questions. The page only scrolls
+    // when the question is not on the screen, so the text can be read in
+    // peace: nothing jumps around while the question is already visible.
+    function ensureQuestionVisible(box) {
       if (!box) return;
 
-      var offset = 0;
-      var passagePanel = form.querySelector(".passage-panel");
-      if (passagePanel && window.getComputedStyle(passagePanel).position === "sticky") {
-        // The distance the sticky box takes up on the screen.
-        var stickyTop = parseFloat(window.getComputedStyle(passagePanel).top) || 0;
-        offset = stickyTop + passagePanel.getBoundingClientRect().height + 16;
-      }
+      var topbar = document.querySelector(".topbar");
+      var margin = (topbar ? topbar.getBoundingClientRect().bottom : 0) + 16;
+      var rect = box.getBoundingClientRect();
 
-      var top = box.getBoundingClientRect().top + window.pageYOffset - offset;
+      if (rect.top >= margin && rect.bottom <= window.innerHeight) return;
+
+      var top = rect.top + window.pageYOffset - margin;
       if (top < 0) top = 0;
       window.scrollTo({ top: top, behavior: "smooth" });
     }
@@ -54,7 +53,7 @@
       if (prevBtn) prevBtn.disabled = index === 0;
       if (nextBtn) nextBtn.disabled = index === boxes.length - 1;
 
-      if (scroll) scrollToBox(boxes[index]);
+      if (scroll) ensureQuestionVisible(boxes[index]);
     }
 
     if (prevBtn) prevBtn.addEventListener("click", function () { showBox(current - 1, true); });
@@ -95,7 +94,6 @@
           var unanswered = boxes[i].querySelector(".question.is-missing");
           if (unanswered) {
             showBox(i, true);
-            unanswered.scrollIntoView({ behavior: "smooth", block: "center" });
             break;
           }
         }
@@ -183,10 +181,17 @@
     Array.prototype.forEach.call(buttons, function (button) {
       button.addEventListener("click", function () {
         var field = document.getElementById(button.getAttribute("data-toggle-password"));
-        if (!field) return;
+        if (!field) {
+          // The field has no id, so it is looked up next to the button.
+          var wrapper = button.closest ? button.closest(".input-with-button") : null;
+          field = wrapper ? wrapper.querySelector("input") : null;
+        }
+        if (!field || (field.type !== "password" && field.type !== "text")) return;
+
         var hidden = field.type === "password";
         field.type = hidden ? "text" : "password";
         button.textContent = hidden ? "Hide" : "Show";
+        button.setAttribute("aria-pressed", hidden ? "true" : "false");
       });
     });
   }
