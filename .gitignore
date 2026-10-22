@@ -10,10 +10,18 @@
 *.db
 *.db-shm
 *.db-wal
+*.db-journal
+*.sqlite
+*.sqlite3
 
 # Environment and secrets
 .env
+.env.*
+!.env.example
 .env.local
+
+# Vercel
+.vercel/
 
 # Editors and operating systems
 .idea/
