@@ -122,7 +122,7 @@ func TestLessonAndQuestions(t *testing.T) {
 	st := newTestStore(t)
 	ctx := context.Background()
 
-	lesson, err := st.CreateLesson(ctx, "Lesson 1", "A short summary", "မြန်မာစာပေ", true)
+	lesson, err := st.CreateLesson(ctx, "Lesson 1", "A short summary", "မြန်မာစာပေ", "日本語の文章", true)
 	if err != nil {
 		t.Fatalf("CreateLesson: %v", err)
 	}
@@ -165,11 +165,53 @@ func TestLessonAndQuestions(t *testing.T) {
 	}
 }
 
+func TestLessonHasTwoTexts(t *testing.T) {
+	st := newTestStore(t)
+	ctx := context.Background()
+
+	lesson, err := st.CreateLesson(ctx, "Lesson", "", "မြန်မာစာပေ", "日本語の文章", true)
+	if err != nil {
+		t.Fatalf("CreateLesson: %v", err)
+	}
+	if lesson.Passage != "မြန်မာစာပေ" {
+		t.Errorf("the lesson text = %q, want %q", lesson.Passage, "မြန်မာစာပေ")
+	}
+	if lesson.QuizPassage != "日本語の文章" {
+		t.Errorf("the question page text = %q, want %q", lesson.QuizPassage, "日本語の文章")
+	}
+
+	if err := st.UpdateLesson(ctx, lesson.ID, "Lesson", "", "မြန်မာစာပေ", "新しい文章", false); err != nil {
+		t.Fatalf("UpdateLesson: %v", err)
+	}
+
+	loaded, err := st.GetLesson(ctx, lesson.ID)
+	if err != nil {
+		t.Fatalf("GetLesson: %v", err)
+	}
+	if loaded.QuizPassage != "新しい文章" {
+		t.Errorf("the question page text = %q, want %q", loaded.QuizPassage, "新しい文章")
+	}
+	if loaded.Published {
+		t.Error("the lesson should be hidden now")
+	}
+
+	lessons, err := st.ListLessons(ctx)
+	if err != nil {
+		t.Fatalf("ListLessons: %v", err)
+	}
+	if len(lessons) != 1 {
+		t.Fatalf("got %d lessons, want 1", len(lessons))
+	}
+	if lessons[0].QuizPassage != "新しい文章" {
+		t.Errorf("the question page text = %q, want %q", lessons[0].QuizPassage, "新しい文章")
+	}
+}
+
 func TestQuestionsWithAVariableNumberOfOptions(t *testing.T) {
 	st := newTestStore(t)
 	ctx := context.Background()
 
-	lesson, _ := st.CreateLesson(ctx, "Lesson", "", "", true)
+	lesson, _ := st.CreateLesson(ctx, "Lesson", "", "", "", true)
 
 	question, err := st.CreateQuestion(ctx, lesson.ID, "How many options?",
 		[]string{"one", "two", "three", "four", "five", "six"}, 6)
@@ -323,13 +365,22 @@ func TestMigrationConvertsLegacyQuestions(t *testing.T) {
 	if selected != "c" {
 		t.Errorf("the stored answer = %q, want %q", selected, "c")
 	}
+
+	// The old lesson got the new column for the text of the question page.
+	lesson, err := st.GetLesson(ctx, 1)
+	if err != nil {
+		t.Fatalf("GetLesson: %v", err)
+	}
+	if lesson.QuizPassage != "" {
+		t.Errorf("the question page text = %q, want it to be empty", lesson.QuizPassage)
+	}
 }
 
 func TestMoveQuestion(t *testing.T) {
 	st := newTestStore(t)
 	ctx := context.Background()
 
-	lesson, _ := st.CreateLesson(ctx, "Lesson", "", "", true)
+	lesson, _ := st.CreateLesson(ctx, "Lesson", "", "", "", true)
 	first, _ := st.CreateQuestion(ctx, lesson.ID, "First", []string{"a", "b", "c", "d"}, 1)
 	second, _ := st.CreateQuestion(ctx, lesson.ID, "Second", []string{"a", "b", "c", "d"}, 1)
 
@@ -354,7 +405,7 @@ func TestCreateAttemptAndStats(t *testing.T) {
 	ctx := context.Background()
 
 	user, _ := st.CreateUser(ctx, "alice", "", "hash", RoleUser, false)
-	lesson, _ := st.CreateLesson(ctx, "Lesson", "", "", true)
+	lesson, _ := st.CreateLesson(ctx, "Lesson", "", "", "", true)
 
 	answers := []AttemptAnswer{
 		{QuestionID: 1, SelectedOption: "a", IsCorrect: true},

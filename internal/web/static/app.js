@@ -16,13 +16,30 @@
     if (boxes.length === 0) return;
 
     var label = document.getElementById("boxLabel");
-    var range = document.getElementById("boxRange");
     var prevBtn = document.getElementById("prevBox");
     var nextBtn = document.getElementById("nextBox");
     var hint = document.getElementById("quizHint");
     var current = 0;
 
-    function showBox(index) {
+    // The text box stays on top of the page, so a question is scrolled to
+    // the place below that box.
+    function scrollToBox(box) {
+      if (!box) return;
+
+      var offset = 0;
+      var passagePanel = form.querySelector(".passage-panel");
+      if (passagePanel && window.getComputedStyle(passagePanel).position === "sticky") {
+        // The distance the sticky box takes up on the screen.
+        var stickyTop = parseFloat(window.getComputedStyle(passagePanel).top) || 0;
+        offset = stickyTop + passagePanel.getBoundingClientRect().height + 16;
+      }
+
+      var top = box.getBoundingClientRect().top + window.pageYOffset - offset;
+      if (top < 0) top = 0;
+      window.scrollTo({ top: top, behavior: "smooth" });
+    }
+
+    function showBox(index, scroll) {
       if (index < 0) index = 0;
       if (index > boxes.length - 1) index = boxes.length - 1;
       current = index;
@@ -33,31 +50,20 @@
         box.classList.toggle("is-active", active);
       });
 
-      if (label) label.textContent = "Box " + (index + 1) + " of " + boxes.length;
-      if (range) {
-        var box = boxes[index];
-        var from = box.getAttribute("data-from");
-        var to = box.getAttribute("data-to");
-        var total = box.getAttribute("data-total");
-        range.textContent = "Questions " + from + "–" + to + " of " + total;
-      }
+      if (label) label.textContent = "Question " + (index + 1) + " of " + boxes.length;
       if (prevBtn) prevBtn.disabled = index === 0;
       if (nextBtn) nextBtn.disabled = index === boxes.length - 1;
 
-      var panel = form.querySelector(".questions-panel");
-      if (panel) {
-        var top = panel.getBoundingClientRect().top + window.pageYOffset - 90;
-        if (window.pageYOffset > top) window.scrollTo({ top: top, behavior: "smooth" });
-      }
+      if (scroll) scrollToBox(boxes[index]);
     }
 
-    if (prevBtn) prevBtn.addEventListener("click", function () { showBox(current - 1); });
-    if (nextBtn) nextBtn.addEventListener("click", function () { showBox(current + 1); });
+    if (prevBtn) prevBtn.addEventListener("click", function () { showBox(current - 1, true); });
+    if (nextBtn) nextBtn.addEventListener("click", function () { showBox(current + 1, true); });
 
     document.addEventListener("keydown", function (event) {
       if (event.target && /^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName)) return;
-      if (event.key === "ArrowLeft") { showBox(current - 1); }
-      if (event.key === "ArrowRight") { showBox(current + 1); }
+      if (event.key === "ArrowLeft") { showBox(current - 1, true); }
+      if (event.key === "ArrowRight") { showBox(current + 1, true); }
     });
 
     // Answer every question before the form may be submitted.
@@ -88,7 +94,7 @@
         for (var i = 0; i < boxes.length; i++) {
           var unanswered = boxes[i].querySelector(".question.is-missing");
           if (unanswered) {
-            showBox(i);
+            showBox(i, true);
             unanswered.scrollIntoView({ behavior: "smooth", block: "center" });
             break;
           }
@@ -105,7 +111,69 @@
       if (question) question.classList.remove("is-missing");
     });
 
-    showBox(0);
+    showBox(0, false);
+  }
+
+  /* ---------------------------------------------------------- dark mode */
+
+  // The button in the top bar switches between the light and the dark
+  // theme. The choice is kept in the browser, without a choice the system
+  // setting of the device is used.
+  function initThemeToggle() {
+    var button = document.getElementById("themeToggle");
+    if (!button) return;
+
+    function storedTheme() {
+      try {
+        return window.localStorage.getItem("theme");
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function systemTheme() {
+      if (!window.matchMedia) return "light";
+      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+
+    function currentTheme() {
+      var theme = storedTheme();
+      if (theme === "light" || theme === "dark") return theme;
+      return systemTheme();
+    }
+
+    function paint(theme) {
+      var next = theme === "dark" ? "light" : "dark";
+      button.textContent = theme === "dark" ? "☀" : "☾";
+      button.setAttribute("title", "Switch to " + next + " mode");
+      button.setAttribute("aria-label", "Switch to " + next + " mode");
+    }
+
+    paint(currentTheme());
+
+    button.addEventListener("click", function () {
+      var theme = currentTheme() === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", theme);
+      try {
+        window.localStorage.setItem("theme", theme);
+      } catch (error) {
+        /* Without storage the theme is only valid for this page. */
+      }
+      paint(theme);
+    });
+
+    // Follow the system setting as long as nothing was chosen by hand.
+    if (window.matchMedia) {
+      var query = window.matchMedia("(prefers-color-scheme: dark)");
+      var listener = function () {
+        if (!storedTheme()) paint(currentTheme());
+      };
+      if (query.addEventListener) {
+        query.addEventListener("change", listener);
+      } else if (query.addListener) {
+        query.addListener(listener);
+      }
+    }
   }
 
   /* ------------------------------------------------------- password toggle */
@@ -256,6 +324,7 @@
     initPasswordToggles();
     initConfirmations();
     initValidation();
+    initThemeToggle();
   }
 
   if (document.readyState === "loading") {

@@ -37,6 +37,13 @@
         {{if .Errors}}<span class="field-error">{{.Errors.Field "passage"}}</span>{{end}}
       </label>
 
+      <label class="field">
+        <span class="field-label">Japanese text</span>
+        <textarea name="quiz_passage" rows="14" lang="ja" class="japanese-input">{{.Lesson.QuizPassage}}</textarea>
+        <span class="field-hint">This text is shown above the questions on the question page. When it is left empty, the Myanmar text is used instead.</span>
+        {{if .Errors}}<span class="field-error">{{.Errors.Field "quiz_passage"}}</span>{{end}}
+      </label>
+
       <label class="checkbox">
         <input type="checkbox" name="published" {{if .Lesson.Published}}checked{{end}}>
         <span>Published (visible on the landing page)</span>

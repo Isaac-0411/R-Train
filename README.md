@@ -17,17 +17,35 @@ managed by administrators in the browser.
 | --- | --- | --- |
 | 1 | `/login`, `/register` | A visitor signs in or creates a normal account. |
 | 2 | `/` | The landing page shows one button per lesson. |
-| 3 | `/lessons/{id}` | The **Myanmar language page**: the text of the lesson in a box and a **Next** button. |
-| 4 | `/lessons/{id}/quiz` | The **question page**: the same text stays on screen on the left, the questions are on the right in boxes of five. Arrow buttons move between the boxes, the text does not move. The **Submit** button sits in the bottom right corner. |
+| 3 | `/lessons/{id}` | The **Myanmar language page**: the Myanmar text of the lesson in a box and a **Next** button. |
+| 4 | `/lessons/{id}/quiz` | The **question page**: the big text box with the Japanese text of the lesson stands on top, one question per card is shown below it. Arrow buttons move from question to question, the text box stays in place. The **Submit** button sits in the bottom right corner. |
 | 5 | `/results/{id}` | The **result page**: the score such as `4 / 20`, the answers and a **Home** button back to the landing page. |
 
-The number of questions per lesson is free. The quiz page always splits them
-into boxes of five, so 20 questions become four boxes and the arrows move
-through them.
+Every lesson has **two texts** and they are written by hand:
+
+* the **Myanmar text** is shown on the lesson page, the learner reads it alone.
+* the **Japanese text** is shown in the big text box of the question page, next
+  to the questions. When it is left empty, the Myanmar text is shown instead,
+  so the box is never empty.
+
+Every **question** gets its own card. The number of questions per lesson is
+free, the arrow buttons move through them one by one.
 
 The number of **answer options** is free as well: every question can have
 between two and eight options, and the administrator decides how many a
 question has while writing it.
+
+The language of the website itself is English, the content of the lessons and
+questions is written by the administrator in the language they want.
+
+---
+
+## Dark mode
+
+The button in the top bar switches between the light and the dark theme. The
+choice is stored in the browser, so it is kept between visits. Without a
+choice the setting of the device is used: a system that is set to dark shows
+the site in dark right away, without a flash of the wrong colours.
 
 ---
 
@@ -108,7 +126,8 @@ That does two things:
 
 1. `adminctl seed-demo` writes a **separate** database (`data/dev.db`) with
    * a demo lesson *နေ့စဉ်လုပ်ဆောင်ချက်* (a Myanmar text about a normal day)
-   * ten questions with two, three, four, five and six options
+     together with the same story in Japanese as the text of the question page
+   * ten Japanese questions with two, three, four, five and six options
    * the learner account `student` with the password `student12345`
    * the main administrator `admin` with the password `local-admin-123`
 2. the server starts on <http://localhost:8080> and uses that database.
@@ -142,8 +161,14 @@ make dev-seed
 ## Writing a lesson and its questions
 
 **Administration → Lessons** opens the editor. A lesson has a title, a short
-description and the Myanmar text. The questions belong to the lesson and are
-written in the same page.
+description and **two texts**:
+
+* **Myanmar text** — the passage the learner reads on the lesson page.
+* **Japanese text** — the text that stands above the questions on the question
+  page. When it is left empty, the Myanmar text is used instead.
+
+Both texts and all the questions are written by hand, nothing is generated.
+The questions belong to the lesson and are written in the same page.
 
 The question editor has one row per answer option:
 

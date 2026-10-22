@@ -5,6 +5,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{.Title}} · Reading Trainer</title>
+  <script>
+    // Set the theme before the page is painted, so the page never flashes
+    // in the wrong colours. Without a stored choice the system setting wins.
+    (function () {
+      try {
+        var theme = window.localStorage.getItem("theme");
+        if (theme === "light" || theme === "dark") {
+          document.documentElement.setAttribute("data-theme", theme);
+        }
+      } catch (error) {
+        /* No storage available, the system setting is used. */
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="/static/style.css">
   <link rel="icon" href="data:,">
 </head>
@@ -30,6 +44,8 @@
     </nav>
 
     <div class="topbar-right">
+      <button type="button" class="btn btn-ghost btn-small theme-toggle" id="themeToggle"
+              title="Switch to dark mode" aria-label="Switch to dark mode">☾</button>
       {{if .User}}
         <span class="user-chip">
           <span class="user-name">{{.User.FullName}}</span>

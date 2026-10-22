@@ -398,6 +398,7 @@ func (s *Server) handleAdminLessonCreate(w http.ResponseWriter, r *http.Request)
 	title := strings.TrimSpace(r.PostFormValue("title"))
 	summary := strings.TrimSpace(r.PostFormValue("summary"))
 	passage := r.PostFormValue("passage")
+	quizPassage := r.PostFormValue("quiz_passage")
 	published := r.PostFormValue("published") == "on"
 
 	validationErrors := validate.New()
@@ -407,22 +408,28 @@ func (s *Server) handleAdminLessonCreate(w http.ResponseWriter, r *http.Request)
 	if msg := validate.Passage(passage); msg != "" {
 		validationErrors.Add("passage", msg)
 	}
+	if msg := validate.Passage(quizPassage); msg != "" {
+		validationErrors.Add("quiz_passage", msg)
+	}
 	if len([]rune(summary)) > 500 {
 		validationErrors.Add("summary", "The description must be at most 500 characters long.")
 	}
 
 	if validationErrors.Any() {
 		s.renderLessonForm(w, r, http.StatusBadRequest, map[string]any{
-			"Title":     "New lesson",
-			"IsNew":     true,
-			"Errors":    validationErrors,
-			"Lesson":    &store.Lesson{Title: title, Summary: summary, Passage: passage, Published: published},
+			"Title":  "New lesson",
+			"IsNew":  true,
+			"Errors": validationErrors,
+			"Lesson": &store.Lesson{
+				Title: title, Summary: summary, Passage: passage,
+				QuizPassage: quizPassage, Published: published,
+			},
 			"Questions": []store.Question{},
 		}, newQuestionEditor())
 		return
 	}
 
-	lesson, err := s.store.CreateLesson(r.Context(), title, summary, passage, published)
+	lesson, err := s.store.CreateLesson(r.Context(), title, summary, passage, quizPassage, published)
 	if err != nil {
 		s.logger.Error("create lesson", "error", err)
 		s.renderError(w, r, http.StatusInternalServerError, "The lesson could not be created.")
@@ -455,6 +462,7 @@ func (s *Server) handleAdminLessonUpdate(w http.ResponseWriter, r *http.Request)
 	title := strings.TrimSpace(r.PostFormValue("title"))
 	summary := strings.TrimSpace(r.PostFormValue("summary"))
 	passage := r.PostFormValue("passage")
+	quizPassage := r.PostFormValue("quiz_passage")
 	published := r.PostFormValue("published") == "on"
 
 	validationErrors := validate.New()
@@ -463,6 +471,9 @@ func (s *Server) handleAdminLessonUpdate(w http.ResponseWriter, r *http.Request)
 	}
 	if msg := validate.Passage(passage); msg != "" {
 		validationErrors.Add("passage", msg)
+	}
+	if msg := validate.Passage(quizPassage); msg != "" {
+		validationErrors.Add("quiz_passage", msg)
 	}
 	if len([]rune(summary)) > 500 {
 		validationErrors.Add("summary", "The description must be at most 500 characters long.")
@@ -480,13 +491,14 @@ func (s *Server) handleAdminLessonUpdate(w http.ResponseWriter, r *http.Request)
 			"Questions": questions,
 			"Lesson": &store.Lesson{
 				ID: lesson.ID, Title: title, Summary: summary, Passage: passage,
-				Published: published, CreatedAt: lesson.CreatedAt, UpdatedAt: lesson.UpdatedAt,
+				QuizPassage: quizPassage, Published: published,
+				CreatedAt: lesson.CreatedAt, UpdatedAt: lesson.UpdatedAt,
 			},
 		}, newQuestionEditor())
 		return
 	}
 
-	if err := s.store.UpdateLesson(r.Context(), id, title, summary, passage, published); err != nil {
+	if err := s.store.UpdateLesson(r.Context(), id, title, summary, passage, quizPassage, published); err != nil {
 		s.logger.Error("update lesson", "error", err)
 		s.renderError(w, r, http.StatusInternalServerError, "The lesson could not be saved.")
 		return

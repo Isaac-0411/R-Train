@@ -311,19 +311,21 @@ func TestAdminCreatesALessonAndLearnerTakesTheQuiz(t *testing.T) {
 	admin := newClient(t, srv.URL)
 	admin.signIn("root", "RootPass123")
 
-	// The administrator creates a lesson.
+	// The administrator creates a lesson with two texts: the Myanmar text
+	// of the lesson page and the Japanese text of the question page.
 	status, _ := admin.post("/admin/lessons", url.Values{
-		"csrf_token": {admin.token("/admin/lessons/new")},
-		"title":      {"Lesson 1"},
-		"summary":    {"The first lesson"},
-		"passage":    {"မြန်မာစာပေ ဖတ်ပါ။"},
-		"published":  {"on"},
+		"csrf_token":   {admin.token("/admin/lessons/new")},
+		"title":        {"Lesson 1"},
+		"summary":      {"The first lesson"},
+		"passage":      {"မြန်မာစာပေ ဖတ်ပါ။"},
+		"quiz_passage": {"日本語の文章です。"},
+		"published":    {"on"},
 	})
 	if status != http.StatusSeeOther {
 		t.Fatalf("creating a lesson returned %d, want 303", status)
 	}
 
-	// And twelve questions, which makes three boxes of five.
+	// And twelve questions, which makes twelve boxes with one question each.
 	for i := 1; i <= 12; i++ {
 		status, _ = admin.post("/admin/lessons/1/questions", url.Values{
 			"csrf_token":     {admin.token("/admin/lessons/1/edit")},
@@ -351,16 +353,28 @@ func TestAdminCreatesALessonAndLearnerTakesTheQuiz(t *testing.T) {
 	if !strings.Contains(body, "မြန်မာစာပေ") {
 		t.Error("the lesson page does not show the text")
 	}
+	if strings.Contains(body, "日本語の文章です。") {
+		t.Error("the lesson page must show the Myanmar text only")
+	}
 
 	status, body = learner.get("/lessons/1/quiz")
 	if status != http.StatusOK {
 		t.Fatalf("GET /lessons/1/quiz returned %d, want 200", status)
 	}
-	if got := strings.Count(body, `class="qbox`); got != 3 {
-		t.Errorf("the quiz shows %d boxes, want 3 (12 questions in boxes of 5)", got)
+	if got := strings.Count(body, `class="qbox`); got != 12 {
+		t.Errorf("the quiz shows %d boxes, want 12 (one question per box)", got)
 	}
-	if !strings.Contains(body, `class="passage"`) {
-		t.Error("the text must stay visible next to the questions")
+	if !strings.Contains(body, `class="passage passage-jp"`) {
+		t.Error("the text box of the question page is missing")
+	}
+	if !strings.Contains(body, "日本語の文章です。") {
+		t.Error("the question page does not show the Japanese text")
+	}
+	if strings.Contains(body, "မြန်မာစာပေ ဖတ်ပါ။") {
+		t.Error("the question page must show the Japanese text, not the Myanmar text")
+	}
+	if !strings.Contains(body, "Question 1 of 12") {
+		t.Error("the question counter is missing")
 	}
 
 	// Twelve questions, nine of them answered correctly.
@@ -396,6 +410,59 @@ func TestAdminCreatesALessonAndLearnerTakesTheQuiz(t *testing.T) {
 	}
 	if !strings.Contains(body, "Lesson 1") {
 		t.Error("the history does not list the result")
+	}
+}
+
+func TestQuestionPageFallsBackToTheMyanmarText(t *testing.T) {
+	srv := newTestServer(t)
+	srv.createRootAdmin(t, "root", "RootPass123")
+
+	admin := newClient(t, srv.URL)
+	admin.signIn("root", "RootPass123")
+
+	// The lesson editor has a field for the text of the question page.
+	status, body := admin.get("/admin/lessons/new")
+	if status != http.StatusOK {
+		t.Fatalf("GET /admin/lessons/new returned %d, want 200", status)
+	}
+	if !strings.Contains(body, `name="quiz_passage"`) {
+		t.Error("the lesson editor has no field for the text of the question page")
+	}
+
+	// A lesson without a Japanese text.
+	status, _ = admin.post("/admin/lessons", url.Values{
+		"csrf_token": {admin.token("/admin/lessons/new")},
+		"title":      {"Lesson 2"},
+		"passage":    {"မြန်မာစာပေ ဖတ်ပါ။"},
+		"published":  {"on"},
+	})
+	if status != http.StatusSeeOther {
+		t.Fatalf("creating a lesson returned %d, want 303", status)
+	}
+	status, _ = admin.post("/admin/lessons/1/questions", url.Values{
+		"csrf_token":     {admin.token("/admin/lessons/1/edit")},
+		"prompt":         {"Question?"},
+		"option_count":   {"2"},
+		"option_1":       {"wrong"},
+		"option_2":       {"right"},
+		"correct_option": {"2"},
+	})
+	if status != http.StatusSeeOther {
+		t.Fatalf("adding a question returned %d, want 303", status)
+	}
+
+	learner := newClient(t, srv.URL)
+	learner.register("bob", "Password123")
+
+	status, body = learner.get("/lessons/1/quiz")
+	if status != http.StatusOK {
+		t.Fatalf("GET /lessons/1/quiz returned %d, want 200", status)
+	}
+	if !strings.Contains(body, "မြန်မာစာပေ ဖတ်ပါ။") {
+		t.Error("the question page must show the Myanmar text when there is no Japanese text")
+	}
+	if !strings.Contains(body, "no Japanese text yet") {
+		t.Error("the question page does not tell the learner that the Myanmar text is shown")
 	}
 }
 

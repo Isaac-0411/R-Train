@@ -12,26 +12,29 @@
   <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 
   <div class="quiz-layout">
-    <aside class="passage-panel card">
-      <h2 class="panel-title">Myanmar text</h2>
-      <div class="passage" lang="my">{{.Lesson.Passage}}</div>
-    </aside>
+    <section class="passage-panel card">
+      <h2 class="panel-title">Japanese text</h2>
+      <div class="passage passage-jp" lang="ja">{{.QuizText}}</div>
+      {{if .TextFallback}}
+        <p class="field-hint">This lesson has no Japanese text yet, so the Myanmar text is shown here.</p>
+      {{end}}
+    </section>
 
     <section class="questions-panel card">
       <div class="box-header">
         <div>
           <h2 class="panel-title">Questions</h2>
-          <p class="muted small" id="boxRange">Questions 1–{{len .Boxes}}</p>
+          <p class="muted small" id="boxRange">{{.Total}} question{{if ne .Total 1}}s{{end}} in this lesson</p>
         </div>
         <div class="box-nav">
-          <button type="button" class="btn btn-icon" id="prevBox" aria-label="Previous box">‹</button>
-          <span class="box-counter" id="boxLabel">Box 1 of {{len .Boxes}}</span>
-          <button type="button" class="btn btn-icon" id="nextBox" aria-label="Next box">›</button>
+          <button type="button" class="btn btn-icon" id="prevBox" aria-label="Previous question">‹</button>
+          <span class="box-counter" id="boxLabel">Question 1 of {{.Total}}</span>
+          <button type="button" class="btn btn-icon" id="nextBox" aria-label="Next question">›</button>
         </div>
       </div>
 
       {{range $box := .Boxes}}
-        <div class="qbox{{if eq $box.Index 0}} is-active{{end}}" data-box="{{$box.Index}}" data-from="{{$box.From}}" data-to="{{$box.To}}" data-total="{{$.Total}}"{{if ne $box.Index 0}} hidden{{end}}>
+        <div class="qbox{{if eq $box.Index 0}} is-active{{end}}" data-box="{{$box.Index}}"{{if ne $box.Index 0}} hidden{{end}}>
           {{range $offset, $question := $box.Questions}}
             <fieldset class="question">
               <legend class="question-legend">

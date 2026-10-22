@@ -3,6 +3,7 @@
    ========================================================================== */
 
 :root {
+  color-scheme: light;
   --bg: #f4f6fb;
   --surface: #ffffff;
   --surface-alt: #f8fafc;
@@ -13,6 +14,7 @@
   --primary: #2563eb;
   --primary-dark: #1d4ed8;
   --primary-soft: #eff4ff;
+  --on-primary: #ffffff;
   --success: #15803d;
   --success-soft: #e8f7ee;
   --danger: #dc2626;
@@ -24,10 +26,16 @@
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, .08);
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-myanmar: "Noto Sans Myanmar", "Padauk", "Myanmar Text", "Myanmar3", var(--font);
+  --font-japanese: "Noto Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic",
+    "Meiryo", var(--font);
 }
 
+/* Dark mode. The system setting is used as long as the visitor has not
+   chosen a theme by hand, the button in the top bar stores that choice. */
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --bg: #0f172a;
     --surface: #1e293b;
     --surface-alt: #172033;
@@ -38,6 +46,7 @@
     --primary: #60a5fa;
     --primary-dark: #3b82f6;
     --primary-soft: #1e293b;
+    --on-primary: #0b1220;
     --success: #4ade80;
     --success-soft: #14321f;
     --danger: #f87171;
@@ -45,6 +54,27 @@
     --warning: #fbbf24;
     --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
   }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --surface-alt: #172033;
+  --border: #2c3a52;
+  --border-strong: #3b4a63;
+  --text: #e8edf6;
+  --text-muted: #94a3b8;
+  --primary: #60a5fa;
+  --primary-dark: #3b82f6;
+  --primary-soft: #1e293b;
+  --on-primary: #0b1220;
+  --success: #4ade80;
+  --success-soft: #14321f;
+  --danger: #f87171;
+  --danger-soft: #3b1d1d;
+  --warning: #fbbf24;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -73,7 +103,7 @@ a:hover { text-decoration: underline; }
   left: -9999px;
   top: 0;
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
   padding: .6rem 1rem;
   z-index: 100;
 }
@@ -116,7 +146,7 @@ a:hover { text-decoration: underline; }
   height: 2rem;
   border-radius: 10px;
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
   font-family: var(--font-myanmar);
   font-size: 1.05rem;
 }
@@ -138,6 +168,16 @@ a:hover { text-decoration: underline; }
 .nav-link.is-active { background: var(--primary-soft); color: var(--primary); }
 
 .topbar-right { display: flex; align-items: center; gap: .6rem; }
+
+.theme-toggle {
+  min-width: 2.4rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  line-height: 1;
+  padding: .35rem .5rem;
+}
 
 .user-chip { display: flex; align-items: center; gap: .4rem; font-size: .9rem; }
 .user-name { font-weight: 600; }
@@ -237,7 +277,7 @@ a:hover { text-decoration: underline; }
 .btn:hover { text-decoration: none; }
 .btn:active { transform: translateY(1px); }
 
-.btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+.btn-primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 .btn-primary:hover { background: var(--primary-dark); border-color: var(--primary-dark); }
 
 .btn-ghost { background: transparent; border-color: var(--border-strong); color: var(--text-muted); }
@@ -407,19 +447,36 @@ input:disabled, select:disabled { opacity: .6; cursor: not-allowed; }
   overflow-y: auto;
 }
 
+/* The text of the question page is written in Japanese. */
+.passage-jp {
+  font-family: var(--font-japanese);
+  line-height: 1.9;
+}
+
 .myanmar-input { font-family: var(--font-myanmar); line-height: 1.9; }
+.japanese-input { font-family: var(--font-japanese); line-height: 1.8; }
 
 /* --- quiz --------------------------------------------------------------- */
 
+/* The text box is big and stays on top, the single question of the box
+   is shown below it. */
 .quiz-layout {
   display: grid;
   gap: 1.25rem;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
 }
 
-.passage-panel { position: sticky; top: 5rem; }
-.passage-panel .passage { max-height: calc(100vh - 12rem); }
+.passage-panel {
+  position: sticky;
+  top: 4.25rem;
+  z-index: 1;
+}
+.passage-panel .passage {
+  min-height: 15rem;
+  max-height: min(46vh, calc(100vh - 15rem));
+  font-size: 1.2rem;
+}
 
 .questions-panel { display: flex; flex-direction: column; }
 
@@ -441,7 +498,7 @@ input:disabled, select:disabled { opacity: .6; cursor: not-allowed; }
 .question {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: .9rem 1rem 1rem;
+  padding: 1.1rem 1.25rem 1.25rem;
   margin: 0;
   background: var(--surface-alt);
 }
@@ -468,7 +525,7 @@ input:disabled, select:disabled { opacity: .6; cursor: not-allowed; }
   height: 1.6rem;
   border-radius: 50%;
   background: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
   font-size: .82rem;
   flex: none;
 }
@@ -501,7 +558,7 @@ input:disabled, select:disabled { opacity: .6; cursor: not-allowed; }
   font-weight: 700;
   flex: none;
 }
-.option:has(input:checked) .option-letter { background: var(--primary); border-color: var(--primary); color: #fff; }
+.option:has(input:checked) .option-letter { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 
 .quiz-footer {
   display: flex;
@@ -568,7 +625,7 @@ input:disabled, select:disabled { opacity: .6; cursor: not-allowed; }
   font-weight: 700;
   letter-spacing: .02em;
 }
-.badge-root { background: var(--primary); color: #fff; }
+.badge-root { background: var(--primary); color: var(--on-primary); }
 .badge-success { background: var(--success-soft); color: var(--success); }
 .badge-muted { background: var(--surface-alt); color: var(--text-muted); border: 1px solid var(--border); }
 
@@ -613,7 +670,7 @@ input:disabled, select:disabled { opacity: .6; cursor: not-allowed; }
 @media (max-width: 900px) {
   .quiz-layout { grid-template-columns: 1fr; }
   .passage-panel { position: static; }
-  .passage-panel .passage { max-height: 40vh; }
+  .passage-panel .passage { max-height: 40vh; font-size: 1.1rem; }
   .two-column-wide { grid-template-columns: 1fr; }
 }
 
@@ -629,5 +686,5 @@ input:disabled, select:disabled { opacity: .6; cursor: not-allowed; }
 
 @media print {
   .topbar, .footer, .quiz-footer, .box-nav { display: none; }
-  body { background: #fff; }
+  body { background: #fff; color: #000; }
 }

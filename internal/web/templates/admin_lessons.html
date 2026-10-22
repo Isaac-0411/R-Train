@@ -17,7 +17,12 @@
               <strong>{{$lesson.Title}}</strong>
               <span class="muted small">Lesson {{add $index 1}}</span>
             </td>
-            <td class="muted">{{if $lesson.Passage}}{{len .Passage}} characters{{else}}—{{end}}</td>
+            <td class="muted">
+              {{if $lesson.Passage}}{{len $lesson.Passage}} characters{{else}}—{{end}}
+              {{if $lesson.QuizPassage}}
+                <span class="small">· {{len $lesson.QuizPassage}} characters on the question page</span>
+              {{end}}
+            </td>
             <td>{{$lesson.QuestionCount}}</td>
             <td>
               {{if $lesson.Published}}

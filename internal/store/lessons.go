@@ -10,20 +10,25 @@ import (
 )
 
 // Lesson is a reading lesson with its Myanmar text and its question set.
+//
+// The lesson has two texts: Passage is the Myanmar text the learner reads on
+// the lesson page, QuizPassage is the text that is shown above the questions
+// on the question page.
 type Lesson struct {
-	ID        int64
-	Title     string
-	Summary   string
-	Passage   string
-	Position  int
-	Published bool
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID          int64
+	Title       string
+	Summary     string
+	Passage     string
+	QuizPassage string
+	Position    int
+	Published   bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 	// QuestionCount is filled in by list queries that need it.
 	QuestionCount int
 }
 
-const lessonColumns = `id, title, summary, passage, position, published, created_at, updated_at`
+const lessonColumns = `id, title, summary, passage, quiz_passage, position, published, created_at, updated_at`
 
 func scanLesson(row interface{ Scan(...any) error }) (*Lesson, error) {
 	var (
@@ -32,7 +37,8 @@ func scanLesson(row interface{ Scan(...any) error }) (*Lesson, error) {
 		createdAt string
 		updatedAt string
 	)
-	if err := row.Scan(&l.ID, &l.Title, &l.Summary, &l.Passage, &l.Position, &published, &createdAt, &updatedAt); err != nil {
+	if err := row.Scan(&l.ID, &l.Title, &l.Summary, &l.Passage, &l.QuizPassage, &l.Position,
+		&published, &createdAt, &updatedAt); err != nil {
 		return nil, err
 	}
 	l.Published = published == 1
@@ -46,7 +52,7 @@ func scanLesson(row interface{ Scan(...any) error }) (*Lesson, error) {
 }
 
 // CreateLesson inserts a new lesson.
-func (s *Store) CreateLesson(ctx context.Context, title, summary, passage string, published bool) (*Lesson, error) {
+func (s *Store) CreateLesson(ctx context.Context, title, summary, passage, quizPassage string, published bool) (*Lesson, error) {
 	now := Now()
 	pub := 0
 	if published {
@@ -59,9 +65,9 @@ func (s *Store) CreateLesson(ctx context.Context, title, summary, passage string
 
 	var id int64
 	id, err := s.execInsert(ctx,
-		`INSERT INTO lessons (title, summary, passage, position, published, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		strings.TrimSpace(title), strings.TrimSpace(summary), passage, position, pub,
+		`INSERT INTO lessons (title, summary, passage, quiz_passage, position, published, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		strings.TrimSpace(title), strings.TrimSpace(summary), passage, quizPassage, position, pub,
 		formatTime(now), formatTime(now))
 	if err != nil {
 		return nil, fmt.Errorf("store: insert lesson: %w", err)
@@ -85,7 +91,7 @@ func (s *Store) GetLesson(ctx context.Context, id int64) (*Lesson, error) {
 // ListLessons returns all lessons with their question counts.
 func (s *Store) ListLessons(ctx context.Context) ([]Lesson, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT l.id, l.title, l.summary, l.passage, l.position, l.published, l.created_at, l.updated_at,
+		`SELECT l.id, l.title, l.summary, l.passage, l.quiz_passage, l.position, l.published, l.created_at, l.updated_at,
 		        (SELECT COUNT(*) FROM questions q WHERE q.lesson_id = l.id)
 		 FROM lessons l ORDER BY l.position ASC, l.id ASC`)
 	if err != nil {
@@ -101,7 +107,7 @@ func (s *Store) ListLessons(ctx context.Context) ([]Lesson, error) {
 			createdAt string
 			updatedAt string
 		)
-		if err := rows.Scan(&l.ID, &l.Title, &l.Summary, &l.Passage, &l.Position, &published,
+		if err := rows.Scan(&l.ID, &l.Title, &l.Summary, &l.Passage, &l.QuizPassage, &l.Position, &published,
 			&createdAt, &updatedAt, &l.QuestionCount); err != nil {
 			return nil, fmt.Errorf("store: scan lesson: %w", err)
 		}
@@ -118,14 +124,14 @@ func (s *Store) ListLessons(ctx context.Context) ([]Lesson, error) {
 }
 
 // UpdateLesson updates the content of a lesson.
-func (s *Store) UpdateLesson(ctx context.Context, id int64, title, summary, passage string, published bool) error {
+func (s *Store) UpdateLesson(ctx context.Context, id int64, title, summary, passage, quizPassage string, published bool) error {
 	pub := 0
 	if published {
 		pub = 1
 	}
 	res, err := s.db.ExecContext(ctx,
-		`UPDATE lessons SET title = ?, summary = ?, passage = ?, published = ?, updated_at = ? WHERE id = ?`,
-		strings.TrimSpace(title), strings.TrimSpace(summary), passage, pub, formatTime(Now()), id)
+		`UPDATE lessons SET title = ?, summary = ?, passage = ?, quiz_passage = ?, published = ?, updated_at = ? WHERE id = ?`,
+		strings.TrimSpace(title), strings.TrimSpace(summary), passage, quizPassage, pub, formatTime(Now()), id)
 	if err != nil {
 		return fmt.Errorf("store: update lesson: %w", err)
 	}

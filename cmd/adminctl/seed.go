@@ -17,8 +17,13 @@ const (
 	demoPassword = "student12345"
 )
 
-// demoPassage is a short Myanmar text for the demo lesson.
+// demoPassage is a short Myanmar text for the demo lesson. It is the text
+// the learner reads on the lesson page.
 const demoPassage = `မောင်အောင်သည် နေ့စဉ် နံနက်စောစော အိမ်မှ ထွက်သွားပြီး ရပ်ကွက်တွင် အလုပ်သမား လုပ်သည်။ အလုပ်ပြီးဆုံး သူသည် ကော်ဖီဆိုင်တွင် ကော်ဖီနှစ်ချိုကို ဝယ်လေးသည်။ ညနေချိန်တွင် သူသည် အိမ်သို့ ပြန်ရောက်ပြီး မိသားစုနှင့် အပြင်းအနိုင်း စားသောက်သည်။ ထမင်းစားပြီးနောက် မောင်အောင်သည် စာပေစာအုပ်များကို ဖတ်သည်။ မိသားစုနှင့် ညီညာကြောင်း ပြောဆိုကြသည်။`
+
+// demoQuizPassage is the text of the question page. It tells the same story
+// as the Myanmar text, but in Japanese.
+const demoQuizPassage = `マウン・アウンさんは毎日、朝早く家を出て、町へ仕事に行きます。仕事のあと、喫茶店へ行き、コーヒーを二杯買います。夕方の時間、家に帰って、家族と一緒に夕食を食べます。食事のあとに、本を読みます。最後は、家族と話し合います。`
 
 // demoQuestion is one question of the demo lesson.
 //
@@ -30,56 +35,57 @@ type demoQuestion struct {
 	Correct int // one based position of the correct option
 }
 
-// demoQuestions are the questions of the demo lesson.
+// demoQuestions are the questions of the demo lesson. They are written in
+// Japanese and belong to the Japanese text of the question page.
 var demoQuestions = []demoQuestion{
 	{
-		Prompt:  "မောင်အောင်သည် အလုပ်သမား လုပ်သည့် နေရာမှာ မည်သနည်း။",
-		Options: []string{"ရပ်ကွက်", "ကျော်ငန်း", "စာမောင်း", "အထည်ဆောင်း"},
+		Prompt:  "マウン・アウンさんはいつ家を出ますか。",
+		Options: []string{"朝早く", "昼過ぎ", "夕方", "夜中"},
 		Correct: 1,
 	},
 	{
-		Prompt:  "မောင်အောင် အိမ်မှ ထွက်သည့် အချိန်မှာ မည်သနည်း။",
-		Options: []string{"နံနက်စောစော", "ညနေ"},
+		Prompt:  "マウン・アウンさんはどこで仕事をしますか。",
+		Options: []string{"町", "家", "学校", "病院", "レストラン"},
 		Correct: 1,
 	},
 	{
-		Prompt:  "အလုပ်ပြီးဆုံး မောင်အောင်က ဝယ်ယူသော ပစ္စည်းမှာ မည်သနည်း။",
-		Options: []string{"ကော်ဖီနှစ်ချို", "စာပေစာအုပ်", "ရေနံချိုစည်"},
+		Prompt:  "仕事のあと、マウン・アウンさんは何をしますか。",
+		Options: []string{"コーヒーを二杯買う", "本を読む", "昼寝する", "電話をかける", "掃除する"},
 		Correct: 1,
 	},
 	{
-		Prompt:  "ညနေချိန်တွင် မောင်အောင်သည် မိသားစုနှင့် ဘာလုပ်သည်နည်း။",
-		Options: []string{"ကော်ဖီဆိုင်သို့ သွားခြင်း", "အပြင်းအနိုင်း စားသောက်ခြင်း", "စာပေဖတ်ခြင်း", "အလုပ်ဆောင်ခြင်း", "အိမ်ေအာင်ခြင်း"},
-		Correct: 2,
-	},
-	{
-		Prompt:  "ထမင်းစားပြီးနောက် မောင်အောင်သည် ဘာလုပ်သည်နည်း။",
-		Options: []string{"စာပေစာအုပ်များကို ဖတ်ခြင်း", "အလုပ်ထပ်ခြင်း"},
+		Prompt:  "コーヒーをどこで買いますか。",
+		Options: []string{"喫茶店", "スーパー", "コンビニ", "本屋", "駅"},
 		Correct: 1,
 	},
 	{
-		Prompt:  "မောင်အောင်သည် မိသားစုနှင့် ညီညာကြောင်း ပြောဆိုကြသော အချိန်မှာ မည်သနည်း။",
-		Options: []string{"နံနက်စောစော", "ညနေ", "နေ့လယ်", "ညပြန်"},
-		Correct: 2,
+		Prompt:  "夕方の時間、マウン・アウンさんはどこにいますか。",
+		Options: []string{"会社", "喫茶店", "公園", "家", "駅"},
+		Correct: 4,
 	},
 	{
-		Prompt:  "မောင်အောင်၏ နေ့စဉ် လုပ်ဆောင်ချက်များတွင် မပါသော အချက်မှာ မည်သနည်း။",
-		Options: []string{"ကော်ဖီဆိုင်တွင် ကော်ဖီရောင်းခြင်း", "ရပ်ကွက်တွင် အလုပ်လုပ်ခြင်း", "စာပေဖတ်ခြင်း", "မိသားစုနှင့် စားသောက်ခြင်း", "အိမ်တွင် အပြင်းအနိုင်းစားခြင်း"},
+		Prompt:  "夕食は誰と一緒に食べますか。",
+		Options: []string{"家族", "同僚", "友達", "先生", "ひとり"},
 		Correct: 1,
 	},
 	{
-		Prompt:  "မောင်အောင်၏ အလုပ်ခံအချိန်မှာ မည်သနည်း။",
-		Options: []string{"နံနက်စောစောမှ ညနေလောက", "ညနေမှ နေ့လယ်လောက"},
+		Prompt:  "ごはんを食べたあと、マウン・アウンさんは何をしますか。",
+		Options: []string{"本を読む", "テレビを見る", "料理を作る", "水泳をする"},
 		Correct: 1,
 	},
 	{
-		Prompt:  "မောင်အောင်က ကော်ဖီကို ဝယ်သည့် နေရာမှာ မည်သနည်း။",
-		Options: []string{"ကော်ဖီဆိုင်", "စျေးကွက်", "ဆိုင်ကယ်", "ပန်းချီဆိုင်", "ဓာတ်ပုံဆိုင်", "စာပေဆိုင်"},
+		Prompt:  "マウン・アウンさんは一日で何回家に帰りますか。",
+		Options: []string{"一回", "二回"},
 		Correct: 1,
 	},
 	{
-		Prompt:  "မောင်အောင်သည် ညနေ အိမ်တွင် ဘာကို လုပ်သည်နည်း။",
-		Options: []string{"ကော်ဖီရောင်းခြင်း", "စာပေဖတ်ခြင်းနှင့် မိသားစုနှင့် ညီညာကြောင်းပြောခြင်း", "အလုပ်လုပ်ခြင်း", "အိမ်ပြင်ရေးခြင်း"},
+		Prompt:  "次のうち、マウン・アウンさんがしないことは何ですか。",
+		Options: []string{"コーヒーを買う", "本を読む", "家族と話す", "水泳をする", "電車に乗る"},
+		Correct: 4,
+	},
+	{
+		Prompt:  "マウン・アウンさんはコーヒーを何杯買いますか。",
+		Options: []string{"一杯", "二杯", "三杯", "四杯"},
 		Correct: 2,
 	},
 }
@@ -112,7 +118,7 @@ func seedDemo(ctx context.Context, st *store.Store, adminUsername, adminPassword
 	}
 
 	lesson, err := st.CreateLesson(ctx, demoLessonTitle,
-		"နေ့စဉ် မောင်အောင်၏ ဘဝကို ဖတ်ပါ", demoPassage, true)
+		"နေ့စဉ် မောင်အောင်၏ ဘဝကို ဖတ်ပါ", demoPassage, demoQuizPassage, true)
 	if err != nil {
 		return err
 	}

@@ -147,6 +147,15 @@ var migrations = []migration{
 		version: 2,
 		apply:   migrateQuestionsToOptions,
 	},
+	{
+		// A lesson has two texts: the Myanmar text of the lesson page and
+		// the Japanese text of the question page. The new column starts out
+		// empty, then the question page falls back to the Myanmar text.
+		version: 3,
+		stmts: []string{
+			`ALTER TABLE lessons ADD COLUMN quiz_passage TEXT NOT NULL DEFAULT ''`,
+		},
+	},
 }
 
 // Migrate applies every pending schema migration.

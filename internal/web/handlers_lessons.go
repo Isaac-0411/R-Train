@@ -11,10 +11,13 @@ import (
 )
 
 // questionsPerBox is the number of questions shown in one box of the quiz.
-const questionsPerBox = 5
+//
+// Every box holds a single question, so the learner reads one question at a
+// time below the text of the question page.
+const questionsPerBox = 1
 
-// QuestionBox is one page of the quiz. The lesson text stays on screen while
-// the user moves between the boxes with the arrow buttons.
+// QuestionBox is one page of the quiz. The text stays on screen while the
+// user moves between the boxes with the arrow buttons.
 type QuestionBox struct {
 	Index     int
 	Number    int
@@ -23,7 +26,7 @@ type QuestionBox struct {
 	Questions []store.Question
 }
 
-// buildBoxes splits the questions of a lesson into boxes of five.
+// buildBoxes splits the questions of a lesson into boxes.
 func buildBoxes(questions []store.Question) []QuestionBox {
 	boxes := []QuestionBox{}
 	for start := 0; start < len(questions); start += questionsPerBox {
@@ -40,6 +43,18 @@ func buildBoxes(questions []store.Question) []QuestionBox {
 		})
 	}
 	return boxes
+}
+
+// quizText returns the text that is shown above the questions.
+//
+// The question page has a text of its own, the Japanese text. When it is
+// empty the Myanmar text of the lesson is shown instead, so the box is
+// never empty.
+func quizText(lesson *store.Lesson) (string, bool) {
+	if strings.TrimSpace(lesson.QuizPassage) != "" {
+		return lesson.QuizPassage, false
+	}
+	return lesson.Passage, true
 }
 
 // handleLanding renders the landing page with the lesson buttons.
@@ -104,12 +119,14 @@ func (s *Server) handleQuiz(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	text, fallback := quizText(lesson)
 	s.render(w, r, http.StatusOK, "quiz", map[string]any{
-		"Title":   lesson.Title,
-		"Lesson":  lesson,
-		"Boxes":   buildBoxes(questions),
-		"Total":   len(questions),
-		"BoxSize": questionsPerBox,
+		"Title":        lesson.Title,
+		"Lesson":       lesson,
+		"Boxes":        buildBoxes(questions),
+		"Total":        len(questions),
+		"QuizText":     text,
+		"TextFallback": fallback,
 	})
 }
 
@@ -169,15 +186,17 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(missing) > 0 {
+		text, fallback := quizText(lesson)
 		s.render(w, r, http.StatusBadRequest, "quiz", map[string]any{
-			"Title":     lesson.Title,
-			"Lesson":    lesson,
-			"Boxes":     buildBoxes(questions),
-			"Total":     len(questions),
-			"BoxSize":   questionsPerBox,
-			"Message":   "Please answer every question before you submit.",
-			"Missing":   missing,
-			"ShowAlert": true,
+			"Title":        lesson.Title,
+			"Lesson":       lesson,
+			"Boxes":        buildBoxes(questions),
+			"Total":        len(questions),
+			"QuizText":     text,
+			"TextFallback": fallback,
+			"Message":      "Please answer every question before you submit.",
+			"Missing":      missing,
+			"ShowAlert":    true,
 		})
 		return
 	}
