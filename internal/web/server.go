@@ -86,6 +86,7 @@ func (s *Server) routes() http.Handler {
 	mux.Handle("GET /account", protected(s.handleAccount))
 	mux.Handle("POST /account/password", protected(s.handleAccountPassword))
 	mux.Handle("POST /account/name", protected(s.handleAccountName))
+	mux.Handle("POST /account/delete", protected(s.handleAccountDelete))
 
 	// --- administration ----------------------------------------------------
 	admin := func(h http.HandlerFunc) http.Handler {
@@ -152,6 +153,23 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.sessions.ClearCookie(w)
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
+
+// logout ends the session of the visitor and sends them to the login page.
+//
+// The message is stored in a fresh guest session, because the session of a
+// deleted account is gone together with the account.
+func (s *Server) logout(w http.ResponseWriter, r *http.Request, message string) {
+	session, err := s.sessions.Rotate(r.Context(), w, r, 0)
+	if err != nil {
+		s.logger.Error("rotate session", "error", err)
+		s.sessions.ClearCookie(w)
+	} else if message != "" {
+		if err := s.store.SetFlash(r.Context(), session.ID, "success", message); err != nil {
+			s.logger.Error("store flash", "error", err)
+		}
+	}
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 

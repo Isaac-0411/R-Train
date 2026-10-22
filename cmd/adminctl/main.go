@@ -10,6 +10,7 @@
 //	adminctl promote      --username alice
 //	adminctl demote       --username alice
 //	adminctl list
+//	adminctl seed-demo    [--username admin --admin-password 'secret']
 //
 // The command reads DB_PATH from the environment, exactly like the server.
 package main
@@ -45,6 +46,8 @@ func run(args []string) error {
 	password := flags.String("password", "", "new password")
 	displayName := flags.String("display-name", "", "display name of the account")
 	role := flags.String("role", store.RoleUser, "account role: admin or user")
+	adminPassword := flags.String("admin-password", "",
+		"password of the main administrator, only used by seed-demo")
 
 	if err := flags.Parse(args[1:]); err != nil {
 		return err
@@ -75,6 +78,8 @@ func run(args []string) error {
 		return changeRole(ctx, st, *username, store.RoleUser)
 	case "list":
 		return listUsers(ctx, st)
+	case "seed-demo":
+		return seedDemo(ctx, st, *username, *adminPassword)
 	case "help", "-h", "--help":
 		usage()
 		return nil
@@ -227,6 +232,12 @@ Commands:
   promote --username <name>      Give an account the administrator role
   demote --username <name>       Take the administrator role away
   list                            Show every account
+
+  seed-demo [--username <name> --admin-password <secret>]
+      Fill the database with a demo lesson, its questions and the learner
+      account "student" (password "student12345"), so the whole flow can be
+      tried out locally. With --admin-password a main administrator is
+      created as well, but only when the database has none yet.
 
 The database is taken from the DB_PATH environment variable.
 `)

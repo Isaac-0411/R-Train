@@ -47,6 +47,27 @@
       <button type="submit" class="btn btn-primary">Change password</button>
     </form>
   </section>
+
+  <section class="card">
+    <h2 class="panel-title">Delete my account</h2>
+    {{if .User.IsRoot}}
+      <p class="muted">
+        You are the main administrator. This account is protected and cannot be deleted.
+      </p>
+    {{else}}
+      <p class="muted">
+        Deleting the account removes your profile, your sessions and all of your results.
+        This cannot be undone.
+      </p>
+      <form method="post" action="/account/delete" class="form">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+        <button type="submit" class="btn btn-danger"
+                data-confirm="Delete your own account? You are signed out and all of your results are removed.">
+          Delete my account
+        </button>
+      </form>
+    {{end}}
+  </section>
 </div>
 
 <div class="stat-row">

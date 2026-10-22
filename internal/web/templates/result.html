@@ -30,7 +30,7 @@
               <strong>{{if .SelectedText}}{{.SelectedOption}}. {{.SelectedText}}{{else}}not answered{{end}}</strong>
             </p>
             {{if not .IsCorrect}}
-              <p class="review-answer">Correct answer: <strong>{{.Correct}}. {{.CorrectText}}</strong></p>
+              <p class="review-answer">Correct answer: <strong>{{.CorrectLetter}}. {{.CorrectText}}</strong></p>
             {{end}}
           </li>
         {{end}}

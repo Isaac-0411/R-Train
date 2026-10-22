@@ -50,8 +50,10 @@ var templateFuncs = template.FuncMap{
 	"upper":     strings.ToUpper,
 	"hasPrefix": strings.HasPrefix,
 	"optionLetter": func(i int) string {
-		return string(rune('A' + i))
+		return store.Letter(i + 1)
 	},
+	"minOptions": func() int { return store.MinOptions },
+	"maxOptions": func() int { return store.MaxOptions },
 }
 
 // loadTemplates parses every page template together with the shared layout.

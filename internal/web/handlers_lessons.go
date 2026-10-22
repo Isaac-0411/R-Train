@@ -148,14 +148,8 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 	for _, question := range questions {
 		field := fmt.Sprintf("q_%d", question.ID)
 		selected := strings.ToLower(strings.TrimSpace(r.PostFormValue(field)))
-		if selected == "" {
-			missing = append(missing, strconv.Itoa(len(answers)+1))
-			answers = append(answers, store.AttemptAnswer{
-				QuestionID: question.ID,
-			})
-			continue
-		}
-		if selected != "a" && selected != "b" && selected != "c" && selected != "d" {
+		index := store.IndexOfLetter(selected)
+		if index < 1 || index > len(question.Options) {
 			missing = append(missing, strconv.Itoa(len(answers)+1))
 			answers = append(answers, store.AttemptAnswer{
 				QuestionID: question.ID,
@@ -163,7 +157,7 @@ func (s *Server) handleSubmit(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		correct := selected == question.Correct
+		correct := index == question.CorrectIndex
 		if correct {
 			score++
 		}

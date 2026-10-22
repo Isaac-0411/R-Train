@@ -3,62 +3,94 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 )
 
-// Question is a multiple choice question belonging to a lesson.
+const (
+	// MinOptions is the smallest number of answer options a question may have.
+	MinOptions = 2
+	// MaxOptions is the largest number of answer options a question may have.
+	MaxOptions = 8
+)
+
+// Options is the list of answer options of a question.
 //
-// The options are always stored as four fixed columns (option_a .. option_d)
-// so that the quiz UI stays simple and consistent.
-type Question struct {
-	ID         int64
-	LessonID   int64
-	Prompt     string
-	OptionA    string
-	OptionB    string
-	OptionC    string
-	OptionD    string
-	Correct    string // "a", "b", "c" or "d"
-	Position   int
-	CreatedAt  time.Time
-	LessonName string
-}
+// The administrator decides how many options a question has. The correct
+// answer is stored as its one based position inside the list.
+type Options []string
 
-// Options returns the four answer options in display order.
-func (q Question) Options() [4]string {
-	return [4]string{q.OptionA, q.OptionB, q.OptionC, q.OptionD}
-}
-
-// OptionText returns the text of an option key.
-func (q Question) OptionText(key string) string {
-	switch strings.ToLower(key) {
-	case "a":
-		return q.OptionA
-	case "b":
-		return q.OptionB
-	case "c":
-		return q.OptionC
-	case "d":
-		return q.OptionD
-	default:
+// Letter returns the letter of the option at the given one based position.
+//
+// The first option is "A", the second "B" and so on. An empty string is
+// returned for a position outside of the list.
+func Letter(position int) string {
+	if position < 1 || position > MaxOptions {
 		return ""
 	}
+	return string(rune('A' + position - 1))
 }
 
-const questionColumns = `id, lesson_id, prompt, option_a, option_b, option_c, option_d, correct_option, position, created_at`
+// IndexOfLetter returns the one based position of an option letter.
+//
+// It returns 0 when the letter does not belong to a valid option.
+func IndexOfLetter(letter string) int {
+	trimmed := strings.ToUpper(strings.TrimSpace(letter))
+	if len(trimmed) != 1 {
+		return 0
+	}
+	position := int(trimmed[0]-'A') + 1
+	if position < 1 || position > MaxOptions {
+		return 0
+	}
+	return position
+}
+
+// Question is a multiple choice question belonging to a lesson.
+//
+// The number of options is chosen by the administrator, it is not fixed.
+type Question struct {
+	ID       int64
+	LessonID int64
+	Prompt   string
+	// Options are the answer choices in display order.
+	Options Options
+	// CorrectIndex is the one based position of the correct option.
+	CorrectIndex int
+	Position     int
+	CreatedAt    time.Time
+}
+
+// CorrectOption returns the text of the correct option.
+func (q Question) CorrectOption() string {
+	if q.CorrectIndex < 1 || q.CorrectIndex > len(q.Options) {
+		return ""
+	}
+	return q.Options[q.CorrectIndex-1]
+}
+
+// CorrectLetter returns the letter of the correct option.
+func (q Question) CorrectLetter() string { return Letter(q.CorrectIndex) }
+
+const questionColumns = `id, lesson_id, prompt, options, correct_option, position, created_at`
 
 func scanQuestion(row interface{ Scan(...any) error }) (*Question, error) {
 	var (
 		q         Question
+		raw       string
 		createdAt string
 	)
-	if err := row.Scan(&q.ID, &q.LessonID, &q.Prompt, &q.OptionA, &q.OptionB, &q.OptionC, &q.OptionD,
-		&q.Correct, &q.Position, &createdAt); err != nil {
+	if err := row.Scan(&q.ID, &q.LessonID, &q.Prompt, &raw, &q.CorrectIndex, &q.Position, &createdAt); err != nil {
 		return nil, err
 	}
+	options, err := unmarshalOptions(raw)
+	if err != nil {
+		return nil, err
+	}
+	q.Options = options
 	if c, err := parseTime(createdAt); err == nil {
 		q.CreatedAt = c
 	}
@@ -66,19 +98,26 @@ func scanQuestion(row interface{ Scan(...any) error }) (*Question, error) {
 }
 
 // CreateQuestion inserts a question and appends it to the end of the lesson.
-func (s *Store) CreateQuestion(ctx context.Context, lessonID int64, prompt, a, b, c, d, correct string) (*Question, error) {
+//
+// The options are stored in the given order, correctIndex is the one based
+// position of the correct option.
+func (s *Store) CreateQuestion(ctx context.Context, lessonID int64, prompt string, options []string, correctIndex int) (*Question, error) {
 	var position int
 	if err := s.db.QueryRowContext(ctx,
 		`SELECT COALESCE(MAX(position), 0) + 1 FROM questions WHERE lesson_id = ?`, lessonID).Scan(&position); err != nil {
 		return nil, fmt.Errorf("store: next question position: %w", err)
 	}
 
+	encoded, err := marshalOptions(options)
+	if err != nil {
+		return nil, err
+	}
+
 	var id int64
-	id, err := s.execInsert(ctx,
-		`INSERT INTO questions (lesson_id, prompt, option_a, option_b, option_c, option_d, correct_option, position, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		lessonID, strings.TrimSpace(prompt), strings.TrimSpace(a), strings.TrimSpace(b),
-		strings.TrimSpace(c), strings.TrimSpace(d), strings.ToLower(correct), position, formatTime(Now()))
+	id, err = s.execInsert(ctx,
+		`INSERT INTO questions (lesson_id, prompt, options, correct_option, position, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?)`,
+		lessonID, strings.TrimSpace(prompt), encoded, correctIndex, position, formatTime(Now()))
 	if err != nil {
 		return nil, fmt.Errorf("store: insert question: %w", err)
 	}
@@ -119,11 +158,15 @@ func (s *Store) ListQuestionsByLesson(ctx context.Context, lessonID int64) ([]Qu
 }
 
 // UpdateQuestion replaces the content of a question.
-func (s *Store) UpdateQuestion(ctx context.Context, id int64, prompt, a, b, c, d, correct string) error {
+func (s *Store) UpdateQuestion(ctx context.Context, id int64, prompt string, options []string, correctIndex int) error {
+	encoded, err := marshalOptions(options)
+	if err != nil {
+		return err
+	}
+
 	res, err := s.db.ExecContext(ctx,
-		`UPDATE questions SET prompt = ?, option_a = ?, option_b = ?, option_c = ?, option_d = ?, correct_option = ? WHERE id = ?`,
-		strings.TrimSpace(prompt), strings.TrimSpace(a), strings.TrimSpace(b), strings.TrimSpace(c),
-		strings.TrimSpace(d), strings.ToLower(correct), id)
+		`UPDATE questions SET prompt = ?, options = ?, correct_option = ? WHERE id = ?`,
+		strings.TrimSpace(prompt), encoded, correctIndex, id)
 	if err != nil {
 		return fmt.Errorf("store: update question: %w", err)
 	}
@@ -201,4 +244,29 @@ func (s *Store) CountQuestions(ctx context.Context, lessonID int64) (int, error)
 		return 0, fmt.Errorf("store: count questions: %w", err)
 	}
 	return count, nil
+}
+
+// marshalOptions encodes the options of a question as a JSON array.
+func marshalOptions(options []string) (string, error) {
+	if options == nil {
+		options = []string{}
+	}
+	data, err := json.Marshal(options)
+	if err != nil {
+		return "", fmt.Errorf("store: encode options: %w", err)
+	}
+	return string(data), nil
+}
+
+// unmarshalOptions decodes the JSON array of the options of a question.
+func unmarshalOptions(raw string) (Options, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return Options{}, nil
+	}
+	var options Options
+	if err := json.Unmarshal([]byte(trimmed), &options); err != nil {
+		return nil, fmt.Errorf("store: decode options: %w", err)
+	}
+	return options, nil
 }

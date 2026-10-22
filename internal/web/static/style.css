@@ -297,6 +297,54 @@ input:disabled, select:disabled { opacity: .6; cursor: not-allowed; }
 
 .option-grid { display: grid; gap: .9rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 
+/* --- option editor -------------------------------------------------------- */
+
+.option-editor { display: grid; gap: .5rem; margin: .2rem 0 .6rem; }
+.option-editor-head { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem; }
+.option-editor .field-hint { margin: 0 0 .2rem; }
+
+.option-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  gap: .5rem;
+}
+
+.option-row-correct {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.option-row-correct:hover { border-color: var(--primary); }
+.option-row-correct input { margin: 0; accent-color: var(--primary); }
+.option-row-correct:has(input:checked) { border-color: var(--primary); background: var(--primary-soft); }
+
+.option-row .option-letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.option-row .field-error { grid-column: 1 / -1; }
+.option-row input[type="text"] { width: 100%; }
+
+@media (max-width: 560px) {
+  .option-row { grid-template-columns: auto auto 1fr; }
+  .option-row [data-remove-option] { grid-column: 3; justify-self: start; }
+}
+
 .filter-form { display: flex; gap: .75rem; align-items: flex-end; flex-wrap: wrap; }
 
 /* --- auth --------------------------------------------------------------- */

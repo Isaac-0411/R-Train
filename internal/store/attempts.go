@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -41,51 +40,30 @@ type AttemptAnswer struct {
 	SelectedOption string
 	IsCorrect      bool
 	// Joined display fields.
-	Prompt     string
-	OptionA    string
-	OptionB    string
-	OptionC    string
-	OptionD    string
-	Correct    string
-	LessonName string
-}
-
-// Options returns the four answer options of the question in display order.
-func (a AttemptAnswer) Options() [4]string {
-	return [4]string{a.OptionA, a.OptionB, a.OptionC, a.OptionD}
+	Prompt       string
+	Options      Options
+	CorrectIndex int
 }
 
 // SelectedText returns the text of the option the user picked.
 func (a AttemptAnswer) SelectedText() string {
-	switch strings.ToLower(a.SelectedOption) {
-	case "a":
-		return a.OptionA
-	case "b":
-		return a.OptionB
-	case "c":
-		return a.OptionC
-	case "d":
-		return a.OptionD
-	default:
+	index := IndexOfLetter(a.SelectedOption)
+	if index < 1 || index > len(a.Options) {
 		return ""
 	}
+	return a.Options[index-1]
 }
 
 // CorrectText returns the text of the correct option.
 func (a AttemptAnswer) CorrectText() string {
-	switch strings.ToLower(a.Correct) {
-	case "a":
-		return a.OptionA
-	case "b":
-		return a.OptionB
-	case "c":
-		return a.OptionC
-	case "d":
-		return a.OptionD
-	default:
+	if a.CorrectIndex < 1 || a.CorrectIndex > len(a.Options) {
 		return ""
 	}
+	return a.Options[a.CorrectIndex-1]
 }
+
+// CorrectLetter returns the letter of the correct option.
+func (a AttemptAnswer) CorrectLetter() string { return Letter(a.CorrectIndex) }
 
 // CreateAttempt stores a submission together with the answers of the user.
 func (s *Store) CreateAttempt(ctx context.Context, userID, lessonID int64, score, total int, answers []AttemptAnswer) (*Attempt, error) {
@@ -170,8 +148,7 @@ func (s *Store) GetAttempt(ctx context.Context, id int64) (*Attempt, error) {
 func (s *Store) ListAttemptAnswers(ctx context.Context, attemptID int64) ([]AttemptAnswer, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT aa.id, aa.attempt_id, aa.question_id, aa.selected_option, aa.is_correct,
-		        COALESCE(q.prompt, ''), COALESCE(q.option_a, ''), COALESCE(q.option_b, ''),
-		        COALESCE(q.option_c, ''), COALESCE(q.option_d, ''), COALESCE(q.correct_option, '')
+		        COALESCE(q.prompt, ''), COALESCE(q.options, '[]'), COALESCE(q.correct_option, 0)
 		 FROM attempt_answers aa
 		 LEFT JOIN questions q ON q.id = aa.question_id
 		 WHERE aa.attempt_id = ? ORDER BY aa.id ASC`, attemptID)
@@ -185,12 +162,17 @@ func (s *Store) ListAttemptAnswers(ctx context.Context, attemptID int64) ([]Atte
 		var (
 			answer    AttemptAnswer
 			isCorrect int
+			raw       string
 		)
 		if err := rows.Scan(&answer.ID, &answer.AttemptID, &answer.QuestionID, &answer.SelectedOption,
-			&isCorrect, &answer.Prompt, &answer.OptionA, &answer.OptionB, &answer.OptionC,
-			&answer.OptionD, &answer.Correct); err != nil {
+			&isCorrect, &answer.Prompt, &raw, &answer.CorrectIndex); err != nil {
 			return nil, fmt.Errorf("store: scan attempt answer: %w", err)
 		}
+		options, err := unmarshalOptions(raw)
+		if err != nil {
+			return nil, err
+		}
+		answer.Options = options
 		answer.IsCorrect = isCorrect == 1
 		answers = append(answers, answer)
 	}

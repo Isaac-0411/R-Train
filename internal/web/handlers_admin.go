@@ -158,8 +158,8 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 
 // handleAdminDeleteUser removes an account.
 //
-// The absolute administrator can never be deleted and nobody can delete
-// their own account.
+// The absolute administrator can never be deleted. Everybody else may delete
+// their own account as well.
 func (s *Server) handleAdminDeleteUser(w http.ResponseWriter, r *http.Request) {
 	actor := currentUser(r)
 	id, ok := pathID(r, "id")
@@ -179,20 +179,26 @@ func (s *Server) handleAdminDeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	switch {
-	case target.IsRoot:
+	if target.IsRoot {
 		s.setFlash(r, "error", "The main administrator cannot be deleted.")
-	case target.ID == actor.ID:
-		s.setFlash(r, "error", "You cannot delete your own account.")
-	default:
-		if err := s.store.DeleteUser(r.Context(), target.ID); err != nil {
-			s.logger.Error("delete user", "error", err)
-			s.setFlash(r, "error", "The account could not be deleted.")
-		} else {
-			s.setFlash(r, "success", "Account "+target.Username+" has been deleted.")
-		}
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		return
 	}
 
+	if err := s.store.DeleteUser(r.Context(), target.ID); err != nil {
+		s.logger.Error("delete user", "error", err)
+		s.setFlash(r, "error", "The account could not be deleted.")
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		return
+	}
+
+	if target.ID == actor.ID {
+		// The administrator deleted their own account, the session ends with it.
+		s.logout(w, r, "Your account has been deleted. You are signed out now.")
+		return
+	}
+
+	s.setFlash(r, "success", "Account "+target.Username+" has been deleted.")
 	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }
 
@@ -311,13 +317,12 @@ func (s *Server) handleAdminLessons(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleAdminLessonForm(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(r, "id")
 	if !ok {
-		s.render(w, r, http.StatusOK, "admin_lesson_form", map[string]any{
-			"Title":      "New lesson",
-			"IsNew":      true,
-			"Lesson":     &store.Lesson{Published: true},
-			"Questions":  []store.Question{},
-			"FormValues": map[string]string{},
-		})
+		s.renderLessonForm(w, r, http.StatusOK, map[string]any{
+			"Title":     "New lesson",
+			"IsNew":     true,
+			"Lesson":    &store.Lesson{Published: true},
+			"Questions": []store.Question{},
+		}, newQuestionEditor())
 		return
 	}
 
@@ -339,13 +344,12 @@ func (s *Server) handleAdminLessonForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.render(w, r, http.StatusOK, "admin_lesson_form", map[string]any{
-		"Title":      "Edit lesson",
-		"IsNew":      false,
-		"Lesson":     lesson,
-		"Questions":  questions,
-		"FormValues": map[string]string{},
-	})
+	s.renderLessonForm(w, r, http.StatusOK, map[string]any{
+		"Title":     "Edit lesson",
+		"IsNew":     false,
+		"Lesson":    lesson,
+		"Questions": questions,
+	}, newQuestionEditor())
 }
 
 // handleAdminQuestionForm opens the editor of a single question.
@@ -380,14 +384,13 @@ func (s *Server) handleAdminQuestionForm(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	s.render(w, r, http.StatusOK, "admin_lesson_form", map[string]any{
+	s.renderLessonForm(w, r, http.StatusOK, map[string]any{
 		"Title":        "Edit question",
 		"IsNew":        false,
 		"Lesson":       lesson,
 		"Questions":    questions,
 		"EditQuestion": question,
-		"FormValues":   map[string]string{},
-	})
+	}, questionEditorFor(question))
 }
 
 // handleAdminLessonCreate stores a new lesson.
@@ -409,14 +412,13 @@ func (s *Server) handleAdminLessonCreate(w http.ResponseWriter, r *http.Request)
 	}
 
 	if validationErrors.Any() {
-		s.render(w, r, http.StatusBadRequest, "admin_lesson_form", map[string]any{
-			"Title":      "New lesson",
-			"IsNew":      true,
-			"Errors":     validationErrors,
-			"Lesson":     &store.Lesson{Title: title, Summary: summary, Passage: passage, Published: published},
-			"Questions":  []store.Question{},
-			"FormValues": map[string]string{},
-		})
+		s.renderLessonForm(w, r, http.StatusBadRequest, map[string]any{
+			"Title":     "New lesson",
+			"IsNew":     true,
+			"Errors":    validationErrors,
+			"Lesson":    &store.Lesson{Title: title, Summary: summary, Passage: passage, Published: published},
+			"Questions": []store.Question{},
+		}, newQuestionEditor())
 		return
 	}
 
@@ -471,17 +473,16 @@ func (s *Server) handleAdminLessonUpdate(w http.ResponseWriter, r *http.Request)
 		if listErr != nil {
 			s.logger.Error("list questions", "error", listErr)
 		}
-		s.render(w, r, http.StatusBadRequest, "admin_lesson_form", map[string]any{
-			"Title":      "Edit lesson",
-			"IsNew":      false,
-			"Errors":     validationErrors,
-			"Questions":  questions,
-			"FormValues": map[string]string{},
+		s.renderLessonForm(w, r, http.StatusBadRequest, map[string]any{
+			"Title":     "Edit lesson",
+			"IsNew":     false,
+			"Errors":    validationErrors,
+			"Questions": questions,
 			"Lesson": &store.Lesson{
 				ID: lesson.ID, Title: title, Summary: summary, Passage: passage,
 				Published: published, CreatedAt: lesson.CreatedAt, UpdatedAt: lesson.UpdatedAt,
 			},
-		})
+		}, newQuestionEditor())
 		return
 	}
 
@@ -538,14 +539,14 @@ func (s *Server) handleAdminQuestionCreate(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	prompt, a, b, c, d, correct, validationErrors := readQuestionForm(r)
+	editor, validationErrors := readQuestionForm(r)
 
 	if validationErrors.Any() {
-		s.renderQuestionForm(w, r, http.StatusBadRequest, lesson, nil, validationErrors, prompt, a, b, c, d, correct)
+		s.renderQuestionForm(w, r, http.StatusBadRequest, lesson, nil, validationErrors, editor)
 		return
 	}
 
-	if _, err := s.store.CreateQuestion(r.Context(), lesson.ID, prompt, a, b, c, d, correct); err != nil {
+	if _, err := s.store.CreateQuestion(r.Context(), lesson.ID, editor.Prompt, editor.Options, editor.CorrectIndex); err != nil {
 		s.logger.Error("create question", "error", err)
 		s.renderError(w, r, http.StatusInternalServerError, "The question could not be saved.")
 		return
@@ -580,14 +581,14 @@ func (s *Server) handleAdminQuestionUpdate(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	prompt, a, b, c, d, correct, validationErrors := readQuestionForm(r)
+	editor, validationErrors := readQuestionForm(r)
 
 	if validationErrors.Any() {
-		s.renderQuestionForm(w, r, http.StatusBadRequest, lesson, question, validationErrors, prompt, a, b, c, d, correct)
+		s.renderQuestionForm(w, r, http.StatusBadRequest, lesson, question, validationErrors, editor)
 		return
 	}
 
-	if err := s.store.UpdateQuestion(r.Context(), question.ID, prompt, a, b, c, d, correct); err != nil {
+	if err := s.store.UpdateQuestion(r.Context(), question.ID, editor.Prompt, editor.Options, editor.CorrectIndex); err != nil {
 		s.logger.Error("update question", "error", err)
 		s.renderError(w, r, http.StatusInternalServerError, "The question could not be saved.")
 		return
@@ -704,33 +705,9 @@ func (s *Server) handleAdminAttemptDelete(w http.ResponseWriter, r *http.Request
 	http.Redirect(w, r, "/admin/attempts", http.StatusSeeOther)
 }
 
-// readQuestionForm reads and validates the question form fields.
-func readQuestionForm(r *http.Request) (prompt, a, b, c, d, correct string, validationErrors validate.Errors) {
-	prompt = strings.TrimSpace(r.PostFormValue("prompt"))
-	a = strings.TrimSpace(r.PostFormValue("option_a"))
-	b = strings.TrimSpace(r.PostFormValue("option_b"))
-	c = strings.TrimSpace(r.PostFormValue("option_c"))
-	d = strings.TrimSpace(r.PostFormValue("option_d"))
-	correct = strings.ToLower(strings.TrimSpace(r.PostFormValue("correct_option")))
-
-	validationErrors = validate.New()
-	if msg := validate.Prompt(prompt); msg != "" {
-		validationErrors.Add("prompt", msg)
-	}
-	for name, value := range map[string]string{"option_a": a, "option_b": b, "option_c": c, "option_d": d} {
-		if msg := validate.Option(value); msg != "" {
-			validationErrors.Add(name, msg)
-		}
-	}
-	if msg := validate.OptionKey(correct); msg != "" {
-		validationErrors.Add("correct_option", msg)
-	}
-	return prompt, a, b, c, d, correct, validationErrors
-}
-
 // renderQuestionForm renders the question area of the lesson editor.
 func (s *Server) renderQuestionForm(w http.ResponseWriter, r *http.Request, status int, lesson *store.Lesson,
-	question *store.Question, validationErrors validate.Errors, prompt, a, b, c, d, correct string) {
+	question *store.Question, validationErrors validate.Errors, editor questionEditor) {
 
 	questions, err := s.store.ListQuestionsByLesson(r.Context(), lesson.ID)
 	if err != nil {
@@ -739,16 +716,12 @@ func (s *Server) renderQuestionForm(w http.ResponseWriter, r *http.Request, stat
 		return
 	}
 
-	s.render(w, r, status, "admin_lesson_form", map[string]any{
+	s.renderLessonForm(w, r, status, map[string]any{
 		"Title":        "Edit lesson",
 		"IsNew":        false,
 		"Lesson":       lesson,
 		"Questions":    questions,
 		"Errors":       validationErrors,
 		"EditQuestion": question,
-		"FormValues": map[string]string{
-			"prompt": prompt, "option_a": a, "option_b": b, "option_c": c,
-			"option_d": d, "correct_option": correct,
-		},
-	})
+	}, editor)
 }

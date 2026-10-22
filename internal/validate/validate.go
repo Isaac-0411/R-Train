@@ -165,16 +165,6 @@ func Option(raw string) string {
 	return ""
 }
 
-// OptionKey validates the letter identifying the correct option.
-func OptionKey(raw string) string {
-	switch strings.TrimSpace(strings.ToLower(raw)) {
-	case "a", "b", "c", "d":
-		return ""
-	default:
-		return "Please choose which option is correct."
-	}
-}
-
 // Role validates an account role.
 func Role(raw string) string {
 	switch strings.TrimSpace(strings.ToLower(raw)) {

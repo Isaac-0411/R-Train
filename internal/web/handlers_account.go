@@ -111,3 +111,33 @@ func (s *Server) handleAccountName(w http.ResponseWriter, r *http.Request) {
 	}
 	http.Redirect(w, r, "/account", http.StatusSeeOther)
 }
+
+// handleAccountDelete lets a user delete their own account.
+//
+// The account and everything that belongs to it — the sessions and the
+// results — are removed. The main administrator is protected and keeps its
+// account.
+func (s *Server) handleAccountDelete(w http.ResponseWriter, r *http.Request) {
+	user := currentUser(r)
+	if user == nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	if user.IsRoot {
+		s.setFlash(r, "error", "The main administrator cannot delete the own account.")
+		http.Redirect(w, r, "/account", http.StatusSeeOther)
+		return
+	}
+
+	if err := s.store.DeleteUser(r.Context(), user.ID); err != nil {
+		s.logger.Error("delete user", "error", err)
+		s.setFlash(r, "error", "The account could not be deleted.")
+		http.Redirect(w, r, "/account", http.StatusSeeOther)
+		return
+	}
+
+	// The session of the account is deleted together with the account, so a
+	// fresh guest session carries the message to the login page.
+	s.logout(w, r, "Your account has been deleted. You are signed out now.")
+}

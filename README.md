@@ -25,6 +25,10 @@ The number of questions per lesson is free. The quiz page always splits them
 into boxes of five, so 20 questions become four boxes and the arrows move
 through them.
 
+The number of **answer options** is free as well: every question can have
+between two and eight options, and the administrator decides how many a
+question has while writing it.
+
 ---
 
 ## Account types and permissions
@@ -44,14 +48,17 @@ through them.
 | Change the role of an account | | | ✔ |
 | Delete a normal account | | ✔ | ✔ |
 | Delete an administrator account | | ✔ (not the main one) | ✔ (not the main one) |
+| Delete **the own** account | ✔ | ✔ | ✘ (protected) |
 | Delete the main administrator | | | ✘ (never) |
 
 The **main administrator** is the very first administrator account. It is
 protected in the database with a unique index, so a second one can never be
 created. It cannot be deleted, not even by itself.
 
-Nobody can delete their own account — that would lock everybody out of the
-site.
+Everybody else can delete their own account: the button **Delete my account**
+is on the profile page `/account`, and an administrator can also delete their
+own account in the account list. Deleting an account removes the account, all
+of its sessions and all of its results.
 
 ---
 
@@ -84,6 +91,73 @@ Both commands read `DB_PATH`, so they use the same database file
 make build            # writes bin/server and bin/adminctl
 ./bin/server
 ```
+
+---
+
+## Trying it out locally
+
+For a quick look at the whole flow — without writing a lesson by hand — the
+`seed-demo` command fills the database with a demo lesson, ten questions with
+different numbers of options and a learner account:
+
+```bash
+make dev
+```
+
+That does two things:
+
+1. `adminctl seed-demo` writes a **separate** database (`data/dev.db`) with
+   * a demo lesson *နေ့စဉ်လုပ်ဆောင်ချက်* (a Myanmar text about a normal day)
+   * ten questions with two, three, four, five and six options
+   * the learner account `student` with the password `student12345`
+   * the main administrator `admin` with the password `local-admin-123`
+2. the server starts on <http://localhost:8080> and uses that database.
+
+Sign in as `admin` to see the administration area, as `student` to take the
+quiz. The command can be run again at any time, it never overwrites an
+existing account and never adds the lesson twice.
+
+The names and the password can be changed:
+
+```bash
+make dev DEV_DB=data/my-test.db DEV_ADMIN_USER=chief DEV_ADMIN_PASS='another-secret'
+```
+
+Or the seeding step alone, without starting the server:
+
+```bash
+make dev-seed
+```
+
+| Account | Password | Role |
+| --- | --- | --- |
+| `admin` | `local-admin-123` | main administrator |
+| `student` | `student12345` | learner |
+
+> These accounts are meant for a local test database only. Never use them in
+> a deployment.
+
+---
+
+## Writing a lesson and its questions
+
+**Administration → Lessons** opens the editor. A lesson has a title, a short
+description and the Myanmar text. The questions belong to the lesson and are
+written in the same page.
+
+The question editor has one row per answer option:
+
+* **+ Add option** appends a row, **Remove** takes one away. The letters and
+  the field names are renumbered automatically, so the form always sends
+  `option_1` … `option_N` together with `option_count`.
+* The round button on the left marks the correct option. It is a radio
+  button, so exactly one option can be correct.
+* Every option needs a text. A question has between **two and eight**
+  options; the server refuses anything else.
+
+The result of a quiz is graded on the server against the position of the
+correct option, so the number of options per question has no effect on the
+scoring.
 
 ---
 
@@ -121,9 +195,12 @@ environment:
 ./bin/adminctl promote     --username alice
 ./bin/adminctl demote      --username alice
 ./bin/adminctl list
+./bin/adminctl seed-demo   --username admin --admin-password 'secret'
 ```
 
-`passwd` also ends every session of that account.
+`passwd` also ends every session of that account. `seed-demo` fills the
+database with demo content for a local test, see
+[Trying it out locally](#trying-it-out-locally).
 
 ---
 
@@ -270,6 +347,7 @@ The application implements the usual defences for a cookie based web app:
 | `GET` | `/results`, `/results/{id}` | owner or administrator |
 | `GET` | `/account` | signed in |
 | `POST` | `/account/name`, `/account/password` | signed in |
+| `POST` | `/account/delete` | signed in, the main administrator is refused |
 | `GET` | `/admin`, `/admin/users`, `/admin/lessons`, `/admin/attempts` | administrator |
 | `POST` | `/admin/users`, `/admin/users/{id}/…` | administrator, main administrator for roles |
 | `POST` | `/admin/lessons`, `/admin/lessons/{id}/…` | administrator |

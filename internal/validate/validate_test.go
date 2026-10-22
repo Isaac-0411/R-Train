@@ -55,19 +55,6 @@ func TestPasswordConfirmation(t *testing.T) {
 	}
 }
 
-func TestOptionKey(t *testing.T) {
-	for _, key := range []string{"a", "b", "c", "d", "A"} {
-		if msg := OptionKey(key); msg != "" {
-			t.Errorf("OptionKey(%q) should pass, got %q", key, msg)
-		}
-	}
-	for _, key := range []string{"", "e", "1", "ab"} {
-		if msg := OptionKey(key); msg == "" {
-			t.Errorf("OptionKey(%q) should fail", key)
-		}
-	}
-}
-
 func TestRole(t *testing.T) {
 	if msg := Role(RoleAdmin); msg != "" {
 		t.Errorf("Role(admin) should pass, got %q", msg)

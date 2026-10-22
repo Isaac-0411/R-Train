@@ -57,31 +57,32 @@
 
       {{if .Questions}}
         <div class="question-admin-list">
-          {{range .Questions}}
+          {{range $question := .Questions}}
             <article class="question-admin">
               <header class="question-admin-head">
-                <span class="question-number">{{.Position}}</span>
-                <strong>{{.Prompt}}</strong>
+                <span class="question-number">{{$question.Position}}</span>
+                <strong>{{$question.Prompt}}</strong>
               </header>
               <ul class="option-list">
-                <li class="{{if eq .Correct "a"}}is-correct{{end}}"><span>A</span> {{.OptionA}}</li>
-                <li class="{{if eq .Correct "b"}}is-correct{{end}}"><span>B</span> {{.OptionB}}</li>
-                <li class="{{if eq .Correct "c"}}is-correct{{end}}"><span>C</span> {{.OptionC}}</li>
-                <li class="{{if eq .Correct "d"}}is-correct{{end}}"><span>D</span> {{.OptionD}}</li>
+                {{range $index, $option := $question.Options}}
+                  <li class="{{if eq (add $index 1) $question.CorrectIndex}}is-correct{{end}}">
+                    <span>{{optionLetter $index}}</span> {{$option}}
+                  </li>
+                {{end}}
               </ul>
               <div class="row-actions">
-                <a class="btn btn-small btn-ghost" href="/admin/questions/{{.ID}}/edit">Edit</a>
-                <form method="post" action="/admin/questions/{{.ID}}/move" class="inline-form">
+                <a class="btn btn-small btn-ghost" href="/admin/questions/{{$question.ID}}/edit">Edit</a>
+                <form method="post" action="/admin/questions/{{$question.ID}}/move" class="inline-form">
                   <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
                   <input type="hidden" name="direction" value="-1">
                   <button type="submit" class="btn btn-small btn-ghost">↑ Move up</button>
                 </form>
-                <form method="post" action="/admin/questions/{{.ID}}/move" class="inline-form">
+                <form method="post" action="/admin/questions/{{$question.ID}}/move" class="inline-form">
                   <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
                   <input type="hidden" name="direction" value="1">
                   <button type="submit" class="btn btn-small btn-ghost">↓ Move down</button>
                 </form>
-                <form method="post" action="/admin/questions/{{.ID}}/delete" class="inline-form">
+                <form method="post" action="/admin/questions/{{$question.ID}}/delete" class="inline-form">
                   <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
                   <button type="submit" class="btn btn-small btn-danger" data-confirm="Delete this question?">Delete</button>
                 </form>
@@ -93,73 +94,53 @@
         <p class="muted">No questions yet. Add the first one below.</p>
       {{end}}
 
-      {{$prompt := ""}}
-      {{$optionA := ""}}
-      {{$optionB := ""}}
-      {{$optionC := ""}}
-      {{$optionD := ""}}
-      {{$correct := ""}}
-      {{if .EditQuestion}}
-        {{$prompt = .EditQuestion.Prompt}}
-        {{$optionA = .EditQuestion.OptionA}}
-        {{$optionB = .EditQuestion.OptionB}}
-        {{$optionC = .EditQuestion.OptionC}}
-        {{$optionD = .EditQuestion.OptionD}}
-        {{$correct = .EditQuestion.Correct}}
-      {{end}}
-      {{if .FormValues}}
-        {{$prompt = index .FormValues "prompt"}}
-        {{$optionA = index .FormValues "option_a"}}
-        {{$optionB = index .FormValues "option_b"}}
-        {{$optionC = index .FormValues "option_c"}}
-        {{$optionD = index .FormValues "option_d"}}
-        {{$correct = index .FormValues "correct_option"}}
-      {{end}}
-
       <h3 class="panel-title panel-title-sub">{{if .EditQuestion}}Edit question{{else}}Add a question{{end}}</h3>
       <form method="post" action="{{if .EditQuestion}}/admin/questions/{{.EditQuestion.ID}}{{else}}/admin/lessons/{{.Lesson.ID}}/questions{{end}}" class="form">
         <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 
         <label class="field">
           <span class="field-label">Question</span>
-          <textarea name="prompt" rows="2" required>{{$prompt}}</textarea>
+          <textarea name="prompt" rows="2" required>{{.PromptValue}}</textarea>
           {{if .Errors}}<span class="field-error">{{.Errors.Field "prompt"}}</span>{{end}}
         </label>
 
-        <div class="option-grid">
-          <label class="field">
-            <span class="field-label">Option A</span>
-            <input type="text" name="option_a" value="{{$optionA}}" maxlength="500" required>
-            {{if .Errors}}<span class="field-error">{{.Errors.Field "option_a"}}</span>{{end}}
-          </label>
-          <label class="field">
-            <span class="field-label">Option B</span>
-            <input type="text" name="option_b" value="{{$optionB}}" maxlength="500" required>
-            {{if .Errors}}<span class="field-error">{{.Errors.Field "option_b"}}</span>{{end}}
-          </label>
-          <label class="field">
-            <span class="field-label">Option C</span>
-            <input type="text" name="option_c" value="{{$optionC}}" maxlength="500" required>
-            {{if .Errors}}<span class="field-error">{{.Errors.Field "option_c"}}</span>{{end}}
-          </label>
-          <label class="field">
-            <span class="field-label">Option D</span>
-            <input type="text" name="option_d" value="{{$optionD}}" maxlength="500" required>
-            {{if .Errors}}<span class="field-error">{{.Errors.Field "option_d"}}</span>{{end}}
-          </label>
+        <div class="option-editor" id="optionEditor" data-min="{{minOptions}}" data-max="{{maxOptions}}">
+          <div class="option-editor-head">
+            <span class="field-label">Answer options</span>
+            <span class="muted small" id="optionCountLabel">{{len .OptionFields}} options</span>
+          </div>
+
+          <p class="field-hint">
+            Choose how many options the question has. Mark the correct one with the
+            round button. Between {{minOptions}} and {{maxOptions}} options are possible.
+          </p>
+
+          {{range $field := .OptionFields}}
+            <div class="option-row">
+              <label class="option-row-correct" title="This option is the correct answer">
+                <input type="radio" name="correct_option" value="{{$field.Index}}" required
+                       {{if eq $field.Index $.CorrectIndex}}checked{{end}}>
+              </label>
+              <span class="option-letter">{{$field.Letter}}</span>
+              <input type="text" class="option-row-text" name="option_{{$field.Index}}" value="{{$field.Text}}"
+                     maxlength="500" required>
+              <button type="button" class="btn btn-small btn-ghost" data-remove-option>Remove</button>
+              {{if $.Errors}}
+                {{with $.Errors.Field (printf "option_%d" $field.Index)}}
+                  <span class="field-error">{{.}}</span>
+                {{end}}
+              {{end}}
+            </div>
+          {{end}}
+
+          <input type="hidden" name="option_count" id="optionCount" value="{{len .OptionFields}}">
+          <button type="button" class="btn btn-small btn-ghost" id="addOption">+ Add option</button>
         </div>
 
-        <label class="field">
-          <span class="field-label">Correct answer</span>
-          <select name="correct_option" required>
-            <option value="" disabled{{if eq $correct ""}} selected{{end}}>Choose the correct option</option>
-            <option value="a"{{if eq $correct "a"}} selected{{end}}>A</option>
-            <option value="b"{{if eq $correct "b"}} selected{{end}}>B</option>
-            <option value="c"{{if eq $correct "c"}} selected{{end}}>C</option>
-            <option value="d"{{if eq $correct "d"}} selected{{end}}>D</option>
-          </select>
-          {{if .Errors}}<span class="field-error">{{.Errors.Field "correct_option"}}</span>{{end}}
-        </label>
+        {{if .Errors}}
+          {{with .Errors.Field "option_count"}}<span class="field-error">{{.}}</span>{{end}}
+          {{with .Errors.Field "correct_option"}}<span class="field-error">{{.}}</span>{{end}}
+        {{end}}
 
         <div class="form-actions">
           <button type="submit" class="btn btn-primary">{{if .EditQuestion}}Save question{{else}}Add question{{end}}</button>

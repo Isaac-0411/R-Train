@@ -63,9 +63,13 @@ func (s *Store) DB() *sql.DB { return s.db }
 func (s *Store) Close() error { return s.db.Close() }
 
 // migration is a single forward-only schema change.
+//
+// A migration either runs a list of statements or a custom function, which
+// is needed for changes that have to read and rewrite existing rows.
 type migration struct {
 	version int
 	stmts   []string
+	apply   func(ctx context.Context, tx *sql.Tx) error
 }
 
 var migrations = []migration{
@@ -106,16 +110,13 @@ var migrations = []migration{
 				updated_at TEXT    NOT NULL
 			)`,
 			`CREATE TABLE IF NOT EXISTS questions (
-				id            INTEGER PRIMARY KEY AUTOINCREMENT,
-				lesson_id     INTEGER NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
-				prompt        TEXT    NOT NULL,
-				option_a      TEXT    NOT NULL DEFAULT '',
-				option_b      TEXT    NOT NULL DEFAULT '',
-				option_c      TEXT    NOT NULL DEFAULT '',
-				option_d      TEXT    NOT NULL DEFAULT '',
-				correct_option TEXT   NOT NULL CHECK (correct_option IN ('a','b','c','d')),
-				position      INTEGER NOT NULL DEFAULT 0,
-				created_at    TEXT    NOT NULL
+				id             INTEGER PRIMARY KEY AUTOINCREMENT,
+				lesson_id      INTEGER NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+				prompt         TEXT    NOT NULL,
+				options        TEXT    NOT NULL DEFAULT '[]',
+				correct_option INTEGER NOT NULL DEFAULT 1,
+				position       INTEGER NOT NULL DEFAULT 0,
+				created_at     TEXT    NOT NULL
 			)`,
 			`CREATE INDEX IF NOT EXISTS idx_questions_lesson ON questions(lesson_id, position, id)`,
 			`CREATE TABLE IF NOT EXISTS attempts (
@@ -138,6 +139,13 @@ var migrations = []migration{
 			)`,
 			`CREATE INDEX IF NOT EXISTS idx_attempt_answers_attempt ON attempt_answers(attempt_id)`,
 		},
+	},
+	{
+		// Converts databases that still use the four fixed option columns
+		// into the new format with a variable number of options. A fresh
+		// database already uses the new format and is left untouched.
+		version: 2,
+		apply:   migrateQuestionsToOptions,
 	},
 }
 
@@ -162,6 +170,12 @@ func (s *Store) Migrate(ctx context.Context) error {
 		tx, err := s.db.BeginTx(ctx, nil)
 		if err != nil {
 			return fmt.Errorf("store: begin migration %d: %w", m.version, err)
+		}
+		if m.apply != nil {
+			if err := m.apply(ctx, tx); err != nil {
+				tx.Rollback()
+				return fmt.Errorf("store: apply migration %d: %w", m.version, err)
+			}
 		}
 		for _, stmt := range m.stmts {
 			if _, err := tx.ExecContext(ctx, stmt); err != nil {

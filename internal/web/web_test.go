@@ -328,11 +328,12 @@ func TestAdminCreatesALessonAndLearnerTakesTheQuiz(t *testing.T) {
 		status, _ = admin.post("/admin/lessons/1/questions", url.Values{
 			"csrf_token":     {admin.token("/admin/lessons/1/edit")},
 			"prompt":         {"Question " + string(rune('A'+i))},
-			"option_a":       {"wrong"},
-			"option_b":       {"right"},
-			"option_c":       {"wrong"},
-			"option_d":       {"wrong"},
-			"correct_option": {"b"},
+			"option_count":   {"4"},
+			"option_1":       {"wrong"},
+			"option_2":       {"right"},
+			"option_3":       {"wrong"},
+			"option_4":       {"wrong"},
+			"correct_option": {"2"},
 		})
 		if status != http.StatusSeeOther {
 			t.Fatalf("adding question %d returned %d, want 303", i, status)
@@ -413,11 +414,12 @@ func TestSubmissionRequiresEveryAnswer(t *testing.T) {
 	admin.post("/admin/lessons/1/questions", url.Values{
 		"csrf_token":     {admin.token("/admin/lessons/1/edit")},
 		"prompt":         {"Question?"},
-		"option_a":       {"a"},
-		"option_b":       {"b"},
-		"option_c":       {"c"},
-		"option_d":       {"d"},
-		"correct_option": {"a"},
+		"option_count":   {"4"},
+		"option_1":       {"a"},
+		"option_2":       {"b"},
+		"option_3":       {"c"},
+		"option_4":       {"d"},
+		"correct_option": {"1"},
 	})
 
 	learner := newClient(t, srv.URL)
@@ -570,11 +572,12 @@ func TestResultOfAnotherLearnerIsHidden(t *testing.T) {
 	admin.post("/admin/lessons/1/questions", url.Values{
 		"csrf_token":     {admin.token("/admin/lessons/1/edit")},
 		"prompt":         {"Question?"},
-		"option_a":       {"a"},
-		"option_b":       {"b"},
-		"option_c":       {"c"},
-		"option_d":       {"d"},
-		"correct_option": {"a"},
+		"option_count":   {"4"},
+		"option_1":       {"a"},
+		"option_2":       {"b"},
+		"option_3":       {"c"},
+		"option_4":       {"d"},
+		"correct_option": {"1"},
 	})
 
 	alice := newClient(t, srv.URL)
@@ -611,11 +614,12 @@ func TestAdminCanDeleteResults(t *testing.T) {
 	admin.post("/admin/lessons/1/questions", url.Values{
 		"csrf_token":     {admin.token("/admin/lessons/1/edit")},
 		"prompt":         {"Question?"},
-		"option_a":       {"a"},
-		"option_b":       {"b"},
-		"option_c":       {"c"},
-		"option_d":       {"d"},
-		"correct_option": {"a"},
+		"option_count":   {"4"},
+		"option_1":       {"a"},
+		"option_2":       {"b"},
+		"option_3":       {"c"},
+		"option_4":       {"d"},
+		"correct_option": {"1"},
 	})
 
 	learner := newClient(t, srv.URL)
@@ -645,6 +649,266 @@ func TestLearnerCannotReachTheAdminArea(t *testing.T) {
 		if status, _ := client.get(path); status != http.StatusForbidden {
 			t.Errorf("GET %s returned %d, want 403", path, status)
 		}
+	}
+}
+
+func TestALearnerCanDeleteTheirOwnAccount(t *testing.T) {
+	srv := newTestServer(t)
+	client := newClient(t, srv.URL)
+	client.register("alice", "Password123")
+
+	status, body := client.get("/account")
+	if status != http.StatusOK {
+		t.Fatalf("GET /account returned %d, want 200", status)
+	}
+	if !strings.Contains(body, "/account/delete") {
+		t.Error("the account page has no delete button")
+	}
+
+	status, _ = client.post("/account/delete", url.Values{
+		"csrf_token": {client.token("/account")},
+	})
+	if status != http.StatusSeeOther {
+		t.Fatalf("the deletion returned %d, want 303", status)
+	}
+
+	// The account is gone and the session does not work any more.
+	if _, err := srv.store.GetUserByUsername(t.Context(), "alice"); err == nil {
+		t.Error("the account was not deleted")
+	}
+	if status, _ := client.get("/"); status != http.StatusSeeOther {
+		t.Errorf("GET / after the deletion returned %d, want 303", status)
+	}
+
+	// The login page tells the visitor what happened.
+	status, body = client.get("/login")
+	if status != http.StatusOK {
+		t.Fatalf("GET /login returned %d, want 200", status)
+	}
+	if !strings.Contains(body, "deleted") {
+		t.Errorf("the login page does not mention the deletion:\n%s", body)
+	}
+}
+
+func TestAnAdministratorCanDeleteTheirOwnAccount(t *testing.T) {
+	srv := newTestServer(t)
+	srv.createRootAdmin(t, "root", "RootPass123")
+
+	// A second administrator, created by the main administrator.
+	root := newClient(t, srv.URL)
+	root.signIn("root", "RootPass123")
+	root.post("/admin/users", url.Values{
+		"csrf_token":            {root.token("/admin/users")},
+		"username":              {"admin2"},
+		"password":              {"Password123"},
+		"password_confirmation": {"Password123"},
+		"role":                  {"admin"},
+	})
+
+	second := newClient(t, srv.URL)
+	second.signIn("admin2", "Password123")
+
+	status, _ := second.post("/admin/users/2/delete", url.Values{
+		"csrf_token": {second.token("/admin/users")},
+	})
+	if status != http.StatusSeeOther {
+		t.Fatalf("the deletion returned %d, want 303", status)
+	}
+	if _, err := srv.store.GetUserByID(t.Context(), 2); err == nil {
+		t.Error("the account was not deleted")
+	}
+	if status, _ := second.get("/admin/users"); status != http.StatusSeeOther {
+		t.Errorf("GET /admin/users after the deletion returned %d, want 303", status)
+	}
+}
+
+func TestTheMainAdministratorCannotDeleteTheOwnAccount(t *testing.T) {
+	srv := newTestServer(t)
+	srv.createRootAdmin(t, "root", "RootPass123")
+
+	root := newClient(t, srv.URL)
+	root.signIn("root", "RootPass123")
+
+	// The account page does not offer the deletion.
+	status, body := root.get("/account")
+	if status != http.StatusOK {
+		t.Fatalf("GET /account returned %d, want 200", status)
+	}
+	if strings.Contains(body, "/account/delete") {
+		t.Error("the main administrator must not be able to delete the own account")
+	}
+
+	// And the request itself is refused.
+	status, _ = root.post("/account/delete", url.Values{
+		"csrf_token": {root.token("/account")},
+	})
+	if status != http.StatusSeeOther {
+		t.Errorf("the deletion returned %d, want 303", status)
+	}
+	if _, err := srv.store.GetUserByID(t.Context(), 1); err != nil {
+		t.Errorf("the main administrator was deleted: %v", err)
+	}
+}
+
+func TestQuestionsWithAVariableNumberOfOptions(t *testing.T) {
+	srv := newTestServer(t)
+	srv.createRootAdmin(t, "root", "RootPass123")
+
+	admin := newClient(t, srv.URL)
+	admin.signIn("root", "RootPass123")
+
+	admin.post("/admin/lessons", url.Values{
+		"csrf_token": {admin.token("/admin/lessons/new")},
+		"title":      {"Lesson 1"},
+		"passage":    {"မြန်မာစာပေ"},
+		"published":  {"on"},
+	})
+
+	// A question with six options.
+	status, _ := admin.post("/admin/lessons/1/questions", url.Values{
+		"csrf_token":     {admin.token("/admin/lessons/1/edit")},
+		"prompt":         {"How many options does this question have?"},
+		"option_count":   {"6"},
+		"option_1":       {"one"},
+		"option_2":       {"two"},
+		"option_3":       {"three"},
+		"option_4":       {"four"},
+		"option_5":       {"five"},
+		"option_6":       {"six"},
+		"correct_option": {"6"},
+	})
+	if status != http.StatusSeeOther {
+		t.Fatalf("adding the question returned %d, want 303", status)
+	}
+
+	// A question with only two options.
+	status, _ = admin.post("/admin/lessons/1/questions", url.Values{
+		"csrf_token":     {admin.token("/admin/lessons/1/edit")},
+		"prompt":         {"True or false?"},
+		"option_count":   {"2"},
+		"option_1":       {"yes"},
+		"option_2":       {"no"},
+		"correct_option": {"1"},
+	})
+	if status != http.StatusSeeOther {
+		t.Fatalf("adding the question returned %d, want 303", status)
+	}
+
+	learner := newClient(t, srv.URL)
+	learner.register("alice", "Password123")
+
+	status, body := learner.get("/lessons/1/quiz")
+	if status != http.StatusOK {
+		t.Fatalf("GET /lessons/1/quiz returned %d, want 200", status)
+	}
+	if !strings.Contains(body, `value="F"`) {
+		t.Error("the quiz does not show the sixth option")
+	}
+	if !strings.Contains(body, "six") {
+		t.Error("the quiz does not show the text of the sixth option")
+	}
+	// The second question has two options, the sixth letter must not be there.
+	if strings.Count(body, `value="F"`) != 1 {
+		t.Errorf("the sixth option is shown %d times, want 1", strings.Count(body, `value="F"`))
+	}
+
+	// The answers are graded with the position of the option.
+	status, _ = learner.post("/lessons/1/submit", url.Values{
+		"csrf_token": {learner.token("/lessons/1/quiz")},
+		"q_1":        {"f"},
+		"q_2":        {"a"},
+	})
+	if status != http.StatusSeeOther {
+		t.Fatalf("the submission returned %d, want 303", status)
+	}
+
+	status, body = learner.get("/results/1")
+	if status != http.StatusOK {
+		t.Fatalf("GET /results/1 returned %d, want 200", status)
+	}
+	if !strings.Contains(body, "2 / 2") {
+		t.Errorf("the result page does not show the score 2 / 2:\n%s", body)
+	}
+}
+
+func TestTheQuestionEditorRefusesBrokenOptionCounts(t *testing.T) {
+	srv := newTestServer(t)
+	srv.createRootAdmin(t, "root", "RootPass123")
+
+	admin := newClient(t, srv.URL)
+	admin.signIn("root", "RootPass123")
+
+	admin.post("/admin/lessons", url.Values{
+		"csrf_token": {admin.token("/admin/lessons/new")},
+		"title":      {"Lesson 1"},
+		"passage":    {"text"},
+		"published":  {"on"},
+	})
+
+	// Only one option.
+	status, _ := admin.post("/admin/lessons/1/questions", url.Values{
+		"csrf_token":     {admin.token("/admin/lessons/1/edit")},
+		"prompt":         {"Question?"},
+		"option_count":   {"1"},
+		"option_1":       {"only one"},
+		"correct_option": {"1"},
+	})
+	if status != http.StatusBadRequest {
+		t.Errorf("the question with one option returned %d, want 400", status)
+	}
+
+	// Too many options.
+	status, _ = admin.post("/admin/lessons/1/questions", url.Values{
+		"csrf_token":     {admin.token("/admin/lessons/1/edit")},
+		"prompt":         {"Question?"},
+		"option_count":   {"9"},
+		"option_1":       {"a"},
+		"option_2":       {"b"},
+		"option_3":       {"c"},
+		"option_4":       {"d"},
+		"option_5":       {"e"},
+		"option_6":       {"f"},
+		"option_7":       {"g"},
+		"option_8":       {"h"},
+		"option_9":       {"i"},
+		"correct_option": {"1"},
+	})
+	if status != http.StatusBadRequest {
+		t.Errorf("the question with nine options returned %d, want 400", status)
+	}
+
+	// An empty option.
+	status, _ = admin.post("/admin/lessons/1/questions", url.Values{
+		"csrf_token":     {admin.token("/admin/lessons/1/edit")},
+		"prompt":         {"Question?"},
+		"option_count":   {"3"},
+		"option_1":       {"a"},
+		"option_2":       {"  "},
+		"option_3":       {"c"},
+		"correct_option": {"1"},
+	})
+	if status != http.StatusBadRequest {
+		t.Errorf("the question with an empty option returned %d, want 400", status)
+	}
+
+	// No correct option.
+	status, _ = admin.post("/admin/lessons/1/questions", url.Values{
+		"csrf_token":   {admin.token("/admin/lessons/1/edit")},
+		"prompt":       {"Question?"},
+		"option_count": {"2"},
+		"option_1":     {"a"},
+		"option_2":     {"b"},
+	})
+	if status != http.StatusBadRequest {
+		t.Errorf("the question without a correct option returned %d, want 400", status)
+	}
+
+	questions, err := srv.store.ListQuestionsByLesson(t.Context(), 1)
+	if err != nil {
+		t.Fatalf("ListQuestionsByLesson: %v", err)
+	}
+	if len(questions) != 0 {
+		t.Errorf("%d broken questions were saved, want 0", len(questions))
 	}
 }
 

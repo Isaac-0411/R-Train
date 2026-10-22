@@ -139,7 +139,7 @@ func TestLessonAndQuestions(t *testing.T) {
 	}
 
 	for i := 0; i < 3; i++ {
-		if _, err := st.CreateQuestion(ctx, lesson.ID, "Question?", "a", "b", "c", "d", "b"); err != nil {
+		if _, err := st.CreateQuestion(ctx, lesson.ID, "Question?", []string{"a", "b", "c", "d"}, 2); err != nil {
 			t.Fatalf("CreateQuestion: %v", err)
 		}
 	}
@@ -154,8 +154,174 @@ func TestLessonAndQuestions(t *testing.T) {
 	if questions[0].Position != 1 || questions[2].Position != 3 {
 		t.Errorf("questions are not ordered by position: %v", questions)
 	}
-	if questions[0].Correct != "b" {
-		t.Errorf("correct option = %q, want %q", questions[0].Correct, "b")
+	if questions[0].CorrectIndex != 2 {
+		t.Errorf("correct option = %d, want %d", questions[0].CorrectIndex, 2)
+	}
+	if questions[0].CorrectLetter() != "B" {
+		t.Errorf("correct letter = %q, want %q", questions[0].CorrectLetter(), "B")
+	}
+	if questions[0].CorrectOption() != "b" {
+		t.Errorf("correct option text = %q, want %q", questions[0].CorrectOption(), "b")
+	}
+}
+
+func TestQuestionsWithAVariableNumberOfOptions(t *testing.T) {
+	st := newTestStore(t)
+	ctx := context.Background()
+
+	lesson, _ := st.CreateLesson(ctx, "Lesson", "", "", true)
+
+	question, err := st.CreateQuestion(ctx, lesson.ID, "How many options?",
+		[]string{"one", "two", "three", "four", "five", "six"}, 6)
+	if err != nil {
+		t.Fatalf("CreateQuestion: %v", err)
+	}
+	if len(question.Options) != 6 {
+		t.Fatalf("the question has %d options, want 6", len(question.Options))
+	}
+	if question.CorrectIndex != 6 {
+		t.Errorf("correct option = %d, want %d", question.CorrectIndex, 6)
+	}
+	if question.CorrectLetter() != "F" {
+		t.Errorf("correct letter = %q, want %q", question.CorrectLetter(), "F")
+	}
+	if question.CorrectOption() != "six" {
+		t.Errorf("correct option text = %q, want %q", question.CorrectOption(), "six")
+	}
+
+	questions, err := st.ListQuestionsByLesson(ctx, lesson.ID)
+	if err != nil {
+		t.Fatalf("ListQuestionsByLesson: %v", err)
+	}
+	if len(questions) != 1 || len(questions[0].Options) != 6 {
+		t.Fatalf("the stored question does not have six options: %v", questions)
+	}
+	if questions[0].Options[5] != "six" {
+		t.Errorf("the sixth option = %q, want %q", questions[0].Options[5], "six")
+	}
+
+	// Two options are enough, they are a question with two answers.
+	short, err := st.CreateQuestion(ctx, lesson.ID, "True or false?",
+		[]string{"yes", "no"}, 2)
+	if err != nil {
+		t.Fatalf("CreateQuestion: %v", err)
+	}
+	if len(short.Options) != 2 || short.CorrectLetter() != "B" {
+		t.Errorf("the short question is wrong: %v", short)
+	}
+}
+
+func TestLetterHelpers(t *testing.T) {
+	if Letter(1) != "A" || Letter(4) != "D" || Letter(8) != "H" {
+		t.Error("the letters of the options are wrong")
+	}
+	if Letter(0) != "" || Letter(9) != "" {
+		t.Error("a position outside of the options must not have a letter")
+	}
+	if IndexOfLetter("a") != 1 || IndexOfLetter("C") != 3 || IndexOfLetter("h") != 8 {
+		t.Error("the position of a letter is wrong")
+	}
+	if IndexOfLetter("") != 0 || IndexOfLetter("i") != 0 || IndexOfLetter("aa") != 0 {
+		t.Error("an invalid letter must not have a position")
+	}
+}
+
+// TestMigrationConvertsLegacyQuestions builds a database in the old format
+// with the four fixed option columns and checks that the migration turns it
+// into the new format without losing the questions.
+func TestMigrationConvertsLegacyQuestions(t *testing.T) {
+	ctx := context.Background()
+
+	st, err := Open(filepath.Join(t.TempDir(), "legacy.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { st.Close() })
+
+	legacy := []string{
+		`CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)`,
+		`INSERT INTO schema_migrations (version, applied_at) VALUES (1, '2024-01-01T00:00:00Z')`,
+		`CREATE TABLE lessons (
+			id         INTEGER PRIMARY KEY AUTOINCREMENT,
+			title      TEXT    NOT NULL,
+			summary    TEXT    NOT NULL DEFAULT '',
+			passage    TEXT    NOT NULL DEFAULT '',
+			position   INTEGER NOT NULL DEFAULT 0,
+			published  INTEGER NOT NULL DEFAULT 1,
+			created_at TEXT    NOT NULL,
+			updated_at TEXT    NOT NULL
+		)`,
+		`INSERT INTO lessons (id, title, summary, passage, position, published, created_at, updated_at)
+		 VALUES (1, 'Lesson 1', '', 'မြန်မာစာပေ', 1, 1, '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z')`,
+		`CREATE TABLE questions (
+			id             INTEGER PRIMARY KEY AUTOINCREMENT,
+			lesson_id      INTEGER NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+			prompt         TEXT    NOT NULL,
+			option_a       TEXT    NOT NULL DEFAULT '',
+			option_b       TEXT    NOT NULL DEFAULT '',
+			option_c       TEXT    NOT NULL DEFAULT '',
+			option_d       TEXT    NOT NULL DEFAULT '',
+			correct_option TEXT    NOT NULL CHECK (correct_option IN ('a','b','c','d')),
+			position       INTEGER NOT NULL DEFAULT 0,
+			created_at     TEXT    NOT NULL
+		)`,
+		`INSERT INTO questions (id, lesson_id, prompt, option_a, option_b, option_c, option_d, correct_option, position, created_at)
+		 VALUES (1, 1, 'Old question', 'first', 'second', 'third', 'fourth', 'c', 1, '2024-01-01T00:00:00Z')`,
+		`CREATE TABLE attempt_answers (
+			id              INTEGER PRIMARY KEY AUTOINCREMENT,
+			attempt_id      INTEGER NOT NULL,
+			question_id     INTEGER NOT NULL,
+			selected_option TEXT    NOT NULL,
+			is_correct      INTEGER NOT NULL
+		)`,
+		`INSERT INTO attempt_answers (attempt_id, question_id, selected_option, is_correct)
+		 VALUES (1, 1, 'c', 1)`,
+	}
+	for _, stmt := range legacy {
+		if _, err := st.DB().ExecContext(ctx, stmt); err != nil {
+			t.Fatalf("build legacy database: %v\n%s", err, stmt)
+		}
+	}
+
+	if err := st.Migrate(ctx); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+
+	questions, err := st.ListQuestionsByLesson(ctx, 1)
+	if err != nil {
+		t.Fatalf("ListQuestionsByLesson: %v", err)
+	}
+	if len(questions) != 1 {
+		t.Fatalf("got %d questions, want 1", len(questions))
+	}
+
+	question := questions[0]
+	if question.Prompt != "Old question" {
+		t.Errorf("prompt = %q, want %q", question.Prompt, "Old question")
+	}
+	if len(question.Options) != 4 {
+		t.Fatalf("the question has %d options, want 4", len(question.Options))
+	}
+	for i, want := range []string{"first", "second", "third", "fourth"} {
+		if question.Options[i] != want {
+			t.Errorf("option %d = %q, want %q", i+1, question.Options[i], want)
+		}
+	}
+	if question.CorrectIndex != 3 {
+		t.Errorf("correct option = %d, want 3", question.CorrectIndex)
+	}
+	if question.CorrectLetter() != "C" {
+		t.Errorf("correct letter = %q, want %q", question.CorrectLetter(), "C")
+	}
+
+	// The old result is still there and shows the right texts.
+	var selected string
+	if err := st.DB().QueryRowContext(ctx,
+		`SELECT selected_option FROM attempt_answers WHERE question_id = 1`).Scan(&selected); err != nil {
+		t.Fatalf("read attempt answer: %v", err)
+	}
+	if selected != "c" {
+		t.Errorf("the stored answer = %q, want %q", selected, "c")
 	}
 }
 
@@ -164,8 +330,8 @@ func TestMoveQuestion(t *testing.T) {
 	ctx := context.Background()
 
 	lesson, _ := st.CreateLesson(ctx, "Lesson", "", "", true)
-	first, _ := st.CreateQuestion(ctx, lesson.ID, "First", "a", "b", "c", "d", "a")
-	second, _ := st.CreateQuestion(ctx, lesson.ID, "Second", "a", "b", "c", "d", "a")
+	first, _ := st.CreateQuestion(ctx, lesson.ID, "First", []string{"a", "b", "c", "d"}, 1)
+	second, _ := st.CreateQuestion(ctx, lesson.ID, "Second", []string{"a", "b", "c", "d"}, 1)
 
 	if err := st.MoveQuestion(ctx, second.ID, -1); err != nil {
 		t.Fatalf("MoveQuestion: %v", err)

@@ -165,10 +165,94 @@
     });
   }
 
+  /* ------------------------------------------------------- option editor */
+
+  // The question editor lets the administrator choose how many answer options
+  // a question has. The rows are renumbered after every change, so the form
+  // always sends option_1 … option_N together with option_count.
+  function initOptionEditor() {
+    var editor = document.getElementById("optionEditor");
+    if (!editor) return;
+
+    var min = parseInt(editor.getAttribute("data-min") || "2", 10);
+    var max = parseInt(editor.getAttribute("data-max") || "8", 10);
+    var countInput = document.getElementById("optionCount");
+    var label = document.getElementById("optionCountLabel");
+    var addButton = document.getElementById("addOption");
+
+    function rows() {
+      return Array.prototype.slice.call(editor.querySelectorAll(".option-row"));
+    }
+
+    function letter(index) {
+      return String.fromCharCode(65 + index);
+    }
+
+    function renumber() {
+      var list = rows();
+
+      list.forEach(function (row, i) {
+        var input = row.querySelector(".option-row-text");
+        var radio = row.querySelector(".option-row-correct input");
+        var tag = row.querySelector(".option-letter");
+        var remove = row.querySelector("[data-remove-option]");
+
+        if (input) {
+          input.name = "option_" + (i + 1);
+          input.setAttribute("aria-label", "Option " + letter(i));
+        }
+        if (radio) radio.value = String(i + 1);
+        if (tag) tag.textContent = letter(i);
+        if (remove) remove.disabled = list.length <= min;
+      });
+
+      if (countInput) countInput.value = list.length;
+      if (label) {
+        label.textContent = list.length + (list.length === 1 ? " option" : " options");
+      }
+      if (addButton) addButton.disabled = list.length >= max;
+    }
+
+    if (addButton) {
+      addButton.addEventListener("click", function () {
+        var list = rows();
+        if (list.length >= max) return;
+
+        var template = list[list.length - 1];
+        if (!template) return;
+
+        var row = template.cloneNode(true);
+        var input = row.querySelector(".option-row-text");
+        var radio = row.querySelector(".option-row-correct input");
+        if (input) input.value = "";
+        if (radio) radio.checked = false;
+
+        editor.insertBefore(row, addButton);
+        renumber();
+        if (input) input.focus();
+      });
+    }
+
+    editor.addEventListener("click", function (event) {
+      var button = event.target.closest ? event.target.closest("[data-remove-option]") : null;
+      if (!button) return;
+
+      var list = rows();
+      if (list.length <= min) return;
+
+      var row = button.closest(".option-row");
+      if (row && row.parentNode) row.parentNode.removeChild(row);
+      renumber();
+    });
+
+    renumber();
+  }
+
   /* ----------------------------------------------------------------- boot */
 
   function boot() {
     initQuiz();
+    initOptionEditor();
     initPasswordToggles();
     initConfirmations();
     initValidation();
