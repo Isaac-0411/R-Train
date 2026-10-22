@@ -17,8 +17,13 @@ import (
 type Config struct {
 	// Addr is the listen address, e.g. ":8080".
 	Addr string
-	// DBPath is the path of the SQLite database file.
+	// DBPath is the path of the SQLite database file. It is ignored when
+	// DatabaseURL is set.
 	DBPath string
+	// DatabaseURL is a PostgreSQL connection string. When it is set the
+	// application stores everything in PostgreSQL instead of SQLite, which
+	// is what the Vercel + Neon deployment uses.
+	DatabaseURL string
 	// CookieSecure marks session cookies as Secure (required behind HTTPS).
 	CookieSecure bool
 	// SessionTTL is the idle timeout of a session: the user is signed out
@@ -43,9 +48,21 @@ type Config struct {
 
 // Load reads the configuration from the environment.
 func Load() Config {
+	addr := env("ADDR", "")
+	if addr == "" {
+		// Vercel and most container platforms inject PORT instead of a
+		// full listen address.
+		if port := strings.TrimPrefix(env("PORT", ""), ":"); port != "" {
+			addr = ":" + port
+		} else {
+			addr = ":8080"
+		}
+	}
+
 	cfg := Config{
-		Addr:              env("ADDR", ":8080"),
+		Addr:              addr,
 		DBPath:            env("DB_PATH", "data/app.db"),
+		DatabaseURL:       env("DATABASE_URL", ""),
 		CookieSecure:      envBool("COOKIE_SECURE", false),
 		SessionTTL:        envDuration("SESSION_TTL", 30*time.Minute),
 		SessionCookieName: env("SESSION_COOKIE_NAME", "rt_session"),
@@ -61,6 +78,17 @@ func Load() Config {
 		cfg.SessionTTL = time.Minute
 	}
 	return cfg
+}
+
+// DSN returns the connection string the store opens.
+//
+// DATABASE_URL wins when it is set, otherwise the SQLite file in DB_PATH is
+// used.
+func (c Config) DSN() string {
+	if c.DatabaseURL != "" {
+		return c.DatabaseURL
+	}
+	return c.DBPath
 }
 
 // HasBootstrapAdmin reports whether an environment bootstrapped admin is configured.
@@ -101,8 +129,13 @@ func envDuration(key string, fallback time.Duration) time.Duration {
 
 // Validate checks the configuration for obvious mistakes.
 func (c Config) Validate() error {
-	if c.DBPath == "" {
-		return fmt.Errorf("config: DB_PATH must not be empty")
+	if c.DatabaseURL == "" && c.DBPath == "" {
+		return fmt.Errorf("config: DB_PATH or DATABASE_URL must be set")
+	}
+	if c.DatabaseURL != "" &&
+		!strings.HasPrefix(c.DatabaseURL, "postgres://") &&
+		!strings.HasPrefix(c.DatabaseURL, "postgresql://") {
+		return fmt.Errorf("config: DATABASE_URL must start with postgres:// or postgresql://")
 	}
 	switch c.LogLevel {
 	case "debug", "info", "warn", "error":

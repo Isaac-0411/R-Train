@@ -2,10 +2,11 @@
 //
 // Configuration is read from the environment:
 //
-//	ADDR               listen address (default ":8080")
+//	ADDR               listen address (default ":8080", or ":$PORT" when PORT is set)
 //	DB_PATH            SQLite database file (default "data/app.db")
+//	DATABASE_URL       PostgreSQL URL; overrides DB_PATH when set
 //	COOKIE_SECURE      set to true when the site is served over HTTPS
-//	SESSION_TTL        session lifetime (default "168h")
+//	SESSION_TTL        idle session timeout (default "30m")
 //	SESSION_COOKIE_NAME  cookie name (default "rt_session")
 //	BASE_URL           public base URL of the site
 //	ADMIN_USERNAME     bootstraps the main administrator on an empty database
@@ -47,7 +48,7 @@ func run() error {
 	logger := newLogger(cfg.LogLevel)
 	slog.SetDefault(logger)
 
-	st, err := store.Open(cfg.DBPath)
+	st, err := store.Open(cfg.DSN())
 	if err != nil {
 		return err
 	}
@@ -57,7 +58,7 @@ func run() error {
 	if err := st.Migrate(ctx); err != nil {
 		return err
 	}
-	logger.Info("database ready", "path", cfg.DBPath)
+	logger.Info("database ready", "driver", st.Driver())
 
 	if err := bootstrapAdmin(ctx, st, cfg, logger); err != nil {
 		return err
@@ -131,6 +132,12 @@ func bootstrapAdmin(ctx context.Context, st *store.Store, cfg config.Config, log
 
 	user, err := st.CreateUser(ctx, cfg.AdminUsername, displayName, hash, store.RoleAdmin, true)
 	if err != nil {
+		// A second serverless instance may have created the account after
+		// the check above; that is a success, not a startup failure.
+		if errors.Is(err, store.ErrDuplicateUsername) {
+			logger.Info("main administrator already exists, skipping the environment bootstrap")
+			return nil
+		}
 		return err
 	}
 

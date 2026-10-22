@@ -80,14 +80,11 @@ func (s *Store) CreateAttempt(ctx context.Context, userID, lessonID int64, score
 	defer tx.Rollback()
 
 	var attemptID int64
-	res, err := tx.ExecContext(ctx,
-		`INSERT INTO attempts (user_id, lesson_id, score, total, passed, submitted_at) VALUES (?, ?, ?, ?, ?, ?)`,
-		userID, lessonID, score, total, passed, formatTime(now))
-	if err != nil {
+	if err := tx.QueryRowContext(ctx,
+		`INSERT INTO attempts (user_id, lesson_id, score, total, passed, submitted_at)
+		 VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
+		userID, lessonID, score, total, passed, formatTime(now)).Scan(&attemptID); err != nil {
 		return nil, fmt.Errorf("store: insert attempt: %w", err)
-	}
-	if attemptID, err = res.LastInsertId(); err != nil {
-		return nil, fmt.Errorf("store: last insert id: %w", err)
 	}
 
 	for _, answer := range answers {

@@ -112,7 +112,9 @@ func (s *Store) GetUserByID(ctx context.Context, id int64) (*User, error) {
 
 // GetUserByUsername loads an account by its username.
 func (s *Store) GetUserByUsername(ctx context.Context, username string) (*User, error) {
-	row := s.db.QueryRowContext(ctx, `SELECT `+userColumns+` FROM users WHERE username = ? COLLATE NOCASE`,
+	// lower() works on both engines and matches the unique index of
+	// PostgreSQL (SQLite additionally compares the column with NOCASE).
+	row := s.db.QueryRowContext(ctx, `SELECT `+userColumns+` FROM users WHERE lower(username) = lower(?)`,
 		strings.TrimSpace(username))
 	u, err := scanUser(row)
 	if errors.Is(err, sql.ErrNoRows) {

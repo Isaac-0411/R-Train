@@ -12,7 +12,8 @@
 //	adminctl list
 //	adminctl seed-demo    [--username admin --admin-password 'secret']
 //
-// The command reads DB_PATH from the environment, exactly like the server.
+// The command reads DB_PATH (SQLite) or DATABASE_URL (PostgreSQL) from the
+// environment, exactly like the server.
 package main
 
 import (
@@ -54,7 +55,7 @@ func run(args []string) error {
 	}
 
 	cfg := config.Load()
-	st, err := store.Open(cfg.DBPath)
+	st, err := store.Open(cfg.DSN())
 	if err != nil {
 		return err
 	}

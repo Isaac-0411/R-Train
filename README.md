@@ -236,8 +236,9 @@ copyable template.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `ADDR` | `:8080` | Listen address |
+| `ADDR` | `:8080` | Listen address; when empty, `PORT` is used |
 | `DB_PATH` | `data/app.db` | SQLite file, the directory is created automatically |
+| `DATABASE_URL` | — | PostgreSQL URL; when set it replaces `DB_PATH` (e.g. Neon) |
 | `SESSION_TTL` | `30m` | Idle timeout: sign out after this long without a request |
 | `SESSION_COOKIE_NAME` | `rt_session` | Name of the session cookie |
 | `COOKIE_SECURE` | `false` | Set to `true` when the site runs on HTTPS |
@@ -273,6 +274,46 @@ ADMIN_USERNAME=root ADMIN_PASSWORD='a-strong-password' docker compose up -d
 
 The database lives in the `/data` volume, so the container can be replaced
 without losing anything.
+
+### Vercel + Neon (serverless, PostgreSQL)
+
+The included `vercel.json` selects the Go framework preset and the Singapore
+region. Vercel functions have no persistent disk, so this deployment stores
+everything in PostgreSQL (Neon) instead of SQLite. SQLite remains the default
+for local development.
+
+1. Create a Neon project and copy its **pooled** connection string.
+2. Import the repository at Vercel and add these environment variables:
+
+   | Variable | Value |
+   | --- | --- |
+   | `DATABASE_URL` | the pooled Neon connection string |
+   | `COOKIE_SECURE` | `true` |
+   | `BASE_URL` | `https://<project>.vercel.app` |
+   | `SESSION_TTL` | `30m` |
+   | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | first administrator, remove afterwards |
+
+   Do not set `ADDR`, `PORT` or `DB_PATH`; Vercel provides `PORT` and the
+   database URL replaces the SQLite file.
+3. Deploy and open `/healthz`. Migrations run on the first request and are
+   protected by a PostgreSQL advisory lock, so concurrent cold starts are
+   safe.
+4. Sign in, change the bootstrap password, then delete `ADMIN_PASSWORD` from
+   the Vercel environment variables and redeploy.
+
+Locally, PostgreSQL can be used with the same URL:
+
+```bash
+DATABASE_URL='postgresql://user:password@host/db?sslmode=require' go run ./cmd/server
+```
+
+The PostgreSQL path is covered by an integration test. It refuses to run
+unless the database name contains `test`:
+
+```bash
+TEST_DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:5432/readingtrainer_test?sslmode=disable' \
+  go test ./internal/store -run TestPostgres
+```
 
 ### Behind a reverse proxy (nginx) with HTTPS
 

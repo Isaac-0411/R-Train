@@ -1,7 +1,8 @@
 // Package store contains the persistence layer of the application.
 //
-// It is a small hand written data access layer on top of SQLite. All
-// queries are parameterised, so user input is never interpolated into SQL.
+// It is a small hand written data access layer that runs on SQLite and
+// PostgreSQL. All queries are parameterised, so user input is never
+// interpolated into SQL.
 package store
 
 import (
@@ -11,21 +12,49 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
 )
 
+// dialect identifies the database engine behind a Store.
+type dialect int
+
+const (
+	dialectSQLite dialect = iota
+	dialectPostgres
+)
+
 // Store is a handle on the application database.
+//
+// The same data access layer runs on SQLite (local development and the
+// classic single binary deployment) and on PostgreSQL (for example Neon,
+// which is used when the site runs on Vercel).
 type Store struct {
-	db *sql.DB
+	db      *sql.DB
+	dialect dialect
 }
 
-// Open connects to the SQLite database at path and prepares the directory.
-func Open(path string) (*Store, error) {
-	if path == "" {
+// Open connects to a database. A PostgreSQL URL ("postgres://" or
+// "postgresql://") selects PostgreSQL, anything else is treated as the path
+// of a SQLite file.
+func Open(dsn string) (*Store, error) {
+	if dsn == "" {
 		return nil, fmt.Errorf("store: database path must not be empty")
 	}
+	if isPostgresDSN(dsn) {
+		db, err := openPostgres(dsn)
+		if err != nil {
+			return nil, err
+		}
+		return &Store{db: db, dialect: dialectPostgres}, nil
+	}
+	if strings.Contains(dsn, "://") {
+		return nil, fmt.Errorf("store: unsupported database URL (want postgres:// or postgresql://)")
+	}
+
+	path := dsn
 	if dir := filepath.Dir(path); dir != "" && dir != "." {
 		if err := os.MkdirAll(dir, 0o750); err != nil {
 			return nil, fmt.Errorf("store: create data directory: %w", err)
@@ -36,10 +65,10 @@ func Open(path string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("store: resolve database path: %w", err)
 	}
-	dsn := (&url.URL{Scheme: "file", Path: abs}).String() +
+	url := (&url.URL{Scheme: "file", Path: abs}).String() +
 		"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)"
 
-	db, err := sql.Open("sqlite", dsn)
+	db, err := sql.Open("sqlite", url)
 	if err != nil {
 		return nil, fmt.Errorf("store: open database: %w", err)
 	}
@@ -53,7 +82,15 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("store: ping database: %w", err)
 	}
-	return &Store{db: db}, nil
+	return &Store{db: db, dialect: dialectSQLite}, nil
+}
+
+// Driver reports the database engine, for log lines.
+func (s *Store) Driver() string {
+	if s.dialect == dialectPostgres {
+		return "postgres"
+	}
+	return "sqlite"
 }
 
 // DB exposes the underlying handle, mainly for tests.
@@ -69,97 +106,53 @@ func (s *Store) Close() error { return s.db.Close() }
 type migration struct {
 	version int
 	stmts   []string
-	apply   func(ctx context.Context, tx *sql.Tx) error
+	apply   func(ctx context.Context, tx *sql.Tx, d dialect) error
 }
 
-var migrations = []migration{
-	{
-		version: 1,
-		stmts: []string{
-			`CREATE TABLE IF NOT EXISTS users (
-				id            INTEGER PRIMARY KEY AUTOINCREMENT,
-				username      TEXT    NOT NULL UNIQUE COLLATE NOCASE,
-				display_name  TEXT    NOT NULL DEFAULT '',
-				password_hash TEXT    NOT NULL,
-				role          TEXT    NOT NULL CHECK (role IN ('admin','user')),
-				is_root       INTEGER NOT NULL DEFAULT 0,
-				created_at    TEXT    NOT NULL
-			)`,
-			`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_root ON users(is_root) WHERE is_root = 1`,
-			`CREATE TABLE IF NOT EXISTS sessions (
-				id         TEXT    PRIMARY KEY,
-				user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
-				csrf_token TEXT    NOT NULL,
-				flash      TEXT    NOT NULL DEFAULT '',
-				flash_kind TEXT    NOT NULL DEFAULT '',
-				created_at TEXT    NOT NULL,
-				expires_at TEXT    NOT NULL,
-				ip         TEXT    NOT NULL DEFAULT '',
-				user_agent TEXT    NOT NULL DEFAULT ''
-			)`,
-			`CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)`,
-			`CREATE INDEX IF NOT EXISTS idx_sessions_expiry ON sessions(expires_at)`,
-			`CREATE TABLE IF NOT EXISTS lessons (
-				id         INTEGER PRIMARY KEY AUTOINCREMENT,
-				title      TEXT    NOT NULL,
-				summary    TEXT    NOT NULL DEFAULT '',
-				passage    TEXT    NOT NULL DEFAULT '',
-				position   INTEGER NOT NULL DEFAULT 0,
-				published  INTEGER NOT NULL DEFAULT 1,
-				created_at TEXT    NOT NULL,
-				updated_at TEXT    NOT NULL
-			)`,
-			`CREATE TABLE IF NOT EXISTS questions (
-				id             INTEGER PRIMARY KEY AUTOINCREMENT,
-				lesson_id      INTEGER NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
-				prompt         TEXT    NOT NULL,
-				options        TEXT    NOT NULL DEFAULT '[]',
-				correct_option INTEGER NOT NULL DEFAULT 1,
-				position       INTEGER NOT NULL DEFAULT 0,
-				created_at     TEXT    NOT NULL
-			)`,
-			`CREATE INDEX IF NOT EXISTS idx_questions_lesson ON questions(lesson_id, position, id)`,
-			`CREATE TABLE IF NOT EXISTS attempts (
-				id           INTEGER PRIMARY KEY AUTOINCREMENT,
-				user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-				lesson_id    INTEGER NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
-				score        INTEGER NOT NULL,
-				total        INTEGER NOT NULL,
-				passed       INTEGER NOT NULL DEFAULT 0,
-				submitted_at TEXT    NOT NULL
-			)`,
-			`CREATE INDEX IF NOT EXISTS idx_attempts_user ON attempts(user_id, submitted_at DESC)`,
-			`CREATE INDEX IF NOT EXISTS idx_attempts_lesson ON attempts(lesson_id)`,
-			`CREATE TABLE IF NOT EXISTS attempt_answers (
-				id              INTEGER PRIMARY KEY AUTOINCREMENT,
-				attempt_id      INTEGER NOT NULL REFERENCES attempts(id) ON DELETE CASCADE,
-				question_id     INTEGER NOT NULL,
-				selected_option TEXT    NOT NULL,
-				is_correct      INTEGER NOT NULL
-			)`,
-			`CREATE INDEX IF NOT EXISTS idx_attempt_answers_attempt ON attempt_answers(attempt_id)`,
+// migrationsFor returns the schema changes of a database engine.
+//
+// Both engines start with the same shape. The only differences are the
+// syntax of automatically assigned ids and the way usernames are compared
+// case-insensitively (PostgreSQL uses a unique index on lower(username)).
+func migrationsFor(d dialect) []migration {
+	schema := sqliteSchema
+	if d == dialectPostgres {
+		schema = postgresSchema
+	}
+	return []migration{
+		{version: 1, stmts: schema},
+		{
+			// Converts databases that still use the four fixed option
+			// columns into the new format with a variable number of
+			// options. A fresh database already uses the new format and is
+			// left untouched. PostgreSQL installations always start fresh,
+			// so the SQLite specific table rebuild is skipped there.
+			version: 2,
+			apply:   migrateQuestionsToOptions,
 		},
-	},
-	{
-		// Converts databases that still use the four fixed option columns
-		// into the new format with a variable number of options. A fresh
-		// database already uses the new format and is left untouched.
-		version: 2,
-		apply:   migrateQuestionsToOptions,
-	},
-	{
-		// A lesson has two texts: the Myanmar text of the lesson page and
-		// the Japanese text of the question page. The new column starts out
-		// empty, then the question page falls back to the Myanmar text.
-		version: 3,
-		stmts: []string{
-			`ALTER TABLE lessons ADD COLUMN quiz_passage TEXT NOT NULL DEFAULT ''`,
+		{
+			// A lesson has two texts: the Myanmar text of the lesson page
+			// and the Japanese text of the question page. The new column
+			// starts out empty, then the question page falls back to the
+			// Myanmar text.
+			version: 3,
+			stmts: []string{
+				`ALTER TABLE lessons ADD COLUMN quiz_passage TEXT NOT NULL DEFAULT ''`,
+			},
 		},
-	},
+	}
 }
 
 // Migrate applies every pending schema migration.
 func (s *Store) Migrate(ctx context.Context) error {
+	if s.dialect == dialectPostgres {
+		return s.migratePostgres(ctx)
+	}
+	return s.migrateSQLite(ctx)
+}
+
+// migrateSQLite applies the migrations one transaction at a time.
+func (s *Store) migrateSQLite(ctx context.Context) error {
 	if _, err := s.db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
 		version    INTEGER PRIMARY KEY,
 		applied_at TEXT NOT NULL
@@ -167,7 +160,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 		return fmt.Errorf("store: create migrations table: %w", err)
 	}
 
-	for _, m := range migrations {
+	for _, m := range migrationsFor(dialectSQLite) {
 		var exists int
 		err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM schema_migrations WHERE version = ?`, m.version).Scan(&exists)
 		if err != nil {
@@ -181,7 +174,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 			return fmt.Errorf("store: begin migration %d: %w", m.version, err)
 		}
 		if m.apply != nil {
-			if err := m.apply(ctx, tx); err != nil {
+			if err := m.apply(ctx, tx, dialectSQLite); err != nil {
 				tx.Rollback()
 				return fmt.Errorf("store: apply migration %d: %w", m.version, err)
 			}
@@ -209,16 +202,12 @@ func Now() time.Time { return time.Now().UTC() }
 
 // execInsert runs an INSERT statement and returns the id of the new row.
 //
-// The driver does not support scanning the result of a plain INSERT, so the
-// id is read from the driver's LastInsertId instead.
+// RETURNING is supported by SQLite and PostgreSQL, which keeps the two
+// dialects on the same code path (PostgreSQL has no LastInsertId).
 func (s *Store) execInsert(ctx context.Context, query string, args ...any) (int64, error) {
-	res, err := s.db.ExecContext(ctx, query, args...)
-	if err != nil {
+	var id int64
+	if err := s.db.QueryRowContext(ctx, query+` RETURNING id`, args...).Scan(&id); err != nil {
 		return 0, err
-	}
-	id, err := res.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("store: last insert id: %w", err)
 	}
 	return id, nil
 }

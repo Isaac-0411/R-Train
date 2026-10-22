@@ -24,7 +24,13 @@ type legacyQuestion struct {
 //
 // A database that already uses the new format is left untouched, so the same
 // migration works for fresh and for existing installations.
-func migrateQuestionsToOptions(ctx context.Context, tx *sql.Tx) error {
+func migrateQuestionsToOptions(ctx context.Context, tx *sql.Tx, d dialect) error {
+	// PostgreSQL databases are always created with the current schema, so
+	// there is no legacy table to rebuild (and PRAGMA is SQLite only).
+	if d == dialectPostgres {
+		return nil
+	}
+
 	legacy, err := hasLegacyQuestionColumns(ctx, tx)
 	if err != nil {
 		return err
