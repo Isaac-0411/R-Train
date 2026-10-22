@@ -5,6 +5,7 @@ import (
 	"errors"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func newTestStore(t *testing.T) *Store {
@@ -494,6 +495,48 @@ func TestSessionLifecycle(t *testing.T) {
 
 	if err := st.DeleteSession(ctx, session.ID); err != nil {
 		t.Fatalf("DeleteSession: %v", err)
+	}
+	if _, err := st.GetSession(ctx, session.ID); !errors.Is(err, ErrNotFound) {
+		t.Errorf("GetSession returned %v, want ErrNotFound", err)
+	}
+}
+
+func TestTouchSessionSlidesTheExpiry(t *testing.T) {
+	st := newTestStore(t)
+	ctx := context.Background()
+
+	session, err := st.CreateSession(ctx, 0, "127.0.0.1", "agent", time.Minute)
+	if err != nil {
+		t.Fatalf("CreateSession: %v", err)
+	}
+
+	expires, err := st.TouchSession(ctx, session.ID, time.Hour)
+	if err != nil {
+		t.Fatalf("TouchSession: %v", err)
+	}
+	if !expires.After(session.ExpiresAt) {
+		t.Errorf("TouchSession returned %v, it should be later than %v", expires, session.ExpiresAt)
+	}
+	if left := time.Until(expires); left < 59*time.Minute {
+		t.Errorf("the session only lives for another %v, want about an hour", left)
+	}
+
+	found, err := st.GetSession(ctx, session.ID)
+	if err != nil {
+		t.Fatalf("GetSession: %v", err)
+	}
+	if !found.ExpiresAt.Equal(expires) {
+		t.Errorf("the stored expiry is %v, TouchSession returned %v", found.ExpiresAt, expires)
+	}
+
+	// A session that was not touched is pruned once its time is up.
+	if _, err := st.DB().ExecContext(ctx,
+		`UPDATE sessions SET expires_at = ? WHERE id = ?`,
+		Now().Add(-time.Minute).Format(time.RFC3339), session.ID); err != nil {
+		t.Fatalf("expire the session: %v", err)
+	}
+	if _, err := st.DeleteExpiredSessions(ctx); err != nil {
+		t.Fatalf("DeleteExpiredSessions: %v", err)
 	}
 	if _, err := st.GetSession(ctx, session.ID); !errors.Is(err, ErrNotFound) {
 		t.Errorf("GetSession returned %v, want ErrNotFound", err)

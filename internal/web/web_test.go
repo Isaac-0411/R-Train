@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"readingtrainer/internal/auth"
 	"readingtrainer/internal/config"
@@ -27,6 +29,13 @@ type testServer struct {
 }
 
 func newTestServer(t *testing.T) *testServer {
+	t.Helper()
+	return newTestServerWith(t, func(cfg *config.Config) {})
+}
+
+// newTestServerWith starts the application on a temporary database. change may
+// adjust the configuration first, e.g. to use a short session timeout.
+func newTestServerWith(t *testing.T, change func(cfg *config.Config)) *testServer {
 	t.Helper()
 
 	st, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
@@ -46,6 +55,7 @@ func newTestServer(t *testing.T) *testServer {
 		SessionCookieName: "rt_session",
 		LogLevel:          "error",
 	}
+	change(&cfg)
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
@@ -122,6 +132,23 @@ func (c *client) post(path string, form url.Values) (int, string) {
 		c.t.Fatalf("read body of %s: %v", path, err)
 	}
 	return resp.StatusCode, string(body)
+}
+
+// request fetches a page and also returns the cookies of the response.
+func (c *client) request(path string) (int, string, []*http.Cookie) {
+	c.t.Helper()
+
+	resp, err := c.http.Get(c.base + path)
+	if err != nil {
+		c.t.Fatalf("GET %s: %v", path, err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		c.t.Fatalf("read body of %s: %v", path, err)
+	}
+	return resp.StatusCode, string(body), resp.Cookies()
 }
 
 // token reads the CSRF token out of a rendered page.
@@ -228,6 +255,109 @@ func TestRegisterCreatesANormalAccount(t *testing.T) {
 	})
 	if status != http.StatusConflict {
 		t.Errorf("the duplicate registration returned %d, want 409", status)
+	}
+}
+
+// findCookie returns the cookie with the given name, or nil.
+func findCookie(cookies []*http.Cookie, name string) *http.Cookie {
+	for _, cookie := range cookies {
+		if cookie.Name == name {
+			return cookie
+		}
+	}
+	return nil
+}
+
+// onlySessionID returns the id of the session that belongs to a signed in user.
+func onlySessionID(t *testing.T, srv *testServer) string {
+	t.Helper()
+
+	var id string
+	err := srv.store.DB().QueryRowContext(t.Context(),
+		`SELECT id FROM sessions WHERE user_id IS NOT NULL ORDER BY created_at DESC LIMIT 1`).Scan(&id)
+	if err != nil {
+		t.Fatalf("find the session: %v", err)
+	}
+	return id
+}
+
+func TestSessionCookieFollowsTheIdleTimeout(t *testing.T) {
+	const ttl = 45 * time.Minute
+
+	srv := newTestServerWith(t, func(cfg *config.Config) { cfg.SessionTTL = ttl })
+	client := newClient(t, srv.URL)
+	client.register("alice", "Password123")
+
+	// The cookie is not a session cookie: it carries the idle timeout.
+	status, _, cookies := client.request("/")
+	if status != http.StatusOK {
+		t.Fatalf("GET / returned %d, want 200", status)
+	}
+	cookie := findCookie(cookies, "rt_session")
+	if cookie == nil {
+		t.Fatal("the response did not send a session cookie")
+	}
+	if want := int(ttl.Seconds()); cookie.MaxAge < want-5 || cookie.MaxAge > want {
+		t.Errorf("the session cookie has Max-Age %d, want about %d", cookie.MaxAge, want)
+	}
+	if cookie.Expires.IsZero() {
+		t.Error("the session cookie has no expiry date")
+	}
+
+	// A request restarts the idle clock of the stored session.
+	id := onlySessionID(t, srv)
+	halfway := store.Now().Add(ttl / 2).Format(time.RFC3339)
+	if _, err := srv.store.DB().ExecContext(t.Context(),
+		`UPDATE sessions SET expires_at = ? WHERE id = ?`, halfway, id); err != nil {
+		t.Fatalf("move the expiry: %v", err)
+	}
+
+	if status, _, _ := client.request("/"); status != http.StatusOK {
+		t.Fatalf("GET / near the timeout returned %d, want 200", status)
+	}
+
+	var stored string
+	if err := srv.store.DB().QueryRowContext(t.Context(),
+		`SELECT expires_at FROM sessions WHERE id = ?`, id).Scan(&stored); err != nil {
+		t.Fatalf("read the expiry: %v", err)
+	}
+	expires, err := time.Parse(time.RFC3339, stored)
+	if err != nil {
+		t.Fatalf("parse the expiry %q: %v", stored, err)
+	}
+	if remaining := time.Until(expires); remaining < ttl-time.Minute {
+		t.Errorf("the request did not extend the session, it expires in %v", remaining)
+	}
+}
+
+func TestExpiredSessionSignsTheUserOut(t *testing.T) {
+	srv := newTestServer(t)
+	client := newClient(t, srv.URL)
+	client.register("alice", "Password123")
+
+	// Let enough time pass without a request.
+	id := onlySessionID(t, srv)
+	past := store.Now().Add(-time.Minute).Format(time.RFC3339)
+	if _, err := srv.store.DB().ExecContext(t.Context(),
+		`UPDATE sessions SET expires_at = ? WHERE id = ?`, past, id); err != nil {
+		t.Fatalf("expire the session: %v", err)
+	}
+
+	status, _, _ := client.request("/")
+	if status != http.StatusSeeOther {
+		t.Fatalf("GET / with an expired session returned %d, want %d", status, http.StatusSeeOther)
+	}
+	if _, err := srv.store.GetSession(t.Context(), id); !errors.Is(err, store.ErrNotFound) {
+		t.Errorf("the expired session still exists: %v", err)
+	}
+
+	// The sign in page explains what happened.
+	status, body := client.get("/login")
+	if status != http.StatusOK {
+		t.Fatalf("GET /login returned %d, want 200", status)
+	}
+	if !strings.Contains(body, "Your session timed out") {
+		t.Error("the sign in page does not explain the timeout")
 	}
 }
 

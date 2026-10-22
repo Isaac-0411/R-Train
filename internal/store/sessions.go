@@ -47,7 +47,9 @@ func (s *Store) CreateSession(ctx context.Context, userID int64, ip, userAgent s
 		HasUser:   userID > 0,
 		CSRFToken: csrf,
 		CreatedAt: now,
-		ExpiresAt: now.Add(ttl),
+		// Stored timestamps have a precision of one second, so the value
+		// handed to the cookie is truncated the same way.
+		ExpiresAt: now.Add(ttl).Truncate(time.Second),
 		IP:        ip,
 		UserAgent: truncate(userAgent, 255),
 	}
@@ -104,13 +106,13 @@ func (s *Store) GetSession(ctx context.Context, id string) (*Session, error) {
 	return &session, nil
 }
 
-// TouchSession extends the lifetime of a session.
-func (s *Store) TouchSession(ctx context.Context, id string, ttl time.Duration) error {
-	expires := formatTime(Now().Add(ttl))
-	if _, err := s.db.ExecContext(ctx, `UPDATE sessions SET expires_at = ? WHERE id = ?`, expires, id); err != nil {
-		return fmt.Errorf("store: touch session: %w", err)
+// TouchSession extends the lifetime of a session and returns the new expiry.
+func (s *Store) TouchSession(ctx context.Context, id string, ttl time.Duration) (time.Time, error) {
+	expires := Now().Add(ttl).Truncate(time.Second)
+	if _, err := s.db.ExecContext(ctx, `UPDATE sessions SET expires_at = ? WHERE id = ?`, formatTime(expires), id); err != nil {
+		return time.Time{}, fmt.Errorf("store: touch session: %w", err)
 	}
-	return nil
+	return expires, nil
 }
 
 // DeleteSession removes a session, e.g. on logout.

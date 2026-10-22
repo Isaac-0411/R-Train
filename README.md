@@ -238,7 +238,7 @@ copyable template.
 | --- | --- | --- |
 | `ADDR` | `:8080` | Listen address |
 | `DB_PATH` | `data/app.db` | SQLite file, the directory is created automatically |
-| `SESSION_TTL` | `168h` | Lifetime of a login |
+| `SESSION_TTL` | `30m` | Idle timeout: sign out after this long without a request |
 | `SESSION_COOKIE_NAME` | `rt_session` | Name of the session cookie |
 | `COOKIE_SECURE` | `false` | Set to `true` when the site runs on HTTPS |
 | `BASE_URL` | — | Public base URL of the site |
@@ -341,6 +341,11 @@ The application implements the usual defences for a cookie based web app:
 * **Sessions** live in the database. The browser only holds a random
   256 bit token in an `HttpOnly`, `SameSite=Lax` cookie that is marked
   `Secure` when `COOKIE_SECURE=true`.
+* **Idle timeout**: a session and its cookie expire after `SESSION_TTL`
+  without a request (30 minutes by default). Every request moves the expiry
+  forward, and the cookie is written again with the same date, so the browser
+  and the server always agree on when the visitor is signed out. An expired
+  session is deleted and the sign in page explains the timeout.
 * **Session fixation** is prevented by rotating the session id after every
   successful login and after a password change.
 * **CSRF**: every session carries a token that must be sent back in the

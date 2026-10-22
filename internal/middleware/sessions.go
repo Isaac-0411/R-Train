@@ -60,23 +60,38 @@ func (s *Sessions) resolve(ctx context.Context, r *http.Request, w http.Response
 	if err == nil && cookie.Value != "" {
 		session, err := s.store.GetSession(ctx, cookie.Value)
 		if err == nil {
-			if session.ExpiresAt.Before(time.Now()) {
+			if session.ExpiresAt.Before(store.Now()) {
+				// The idle timeout has passed and the session is over.
 				_ = s.store.DeleteSession(ctx, session.ID)
-			} else {
-				// Keep the session alive for active users.
-				_ = s.store.TouchSession(ctx, session.ID, s.ttl)
-				if session.HasUser {
-					user, err := s.store.GetUserByID(ctx, session.UserID)
-					if err == nil {
-						return session, user
-					}
-					// The account was deleted while the session was alive.
-					_ = s.store.DeleteSession(ctx, session.ID)
-					return s.createGuest(ctx, r, w)
+				guest, _ := s.createGuest(ctx, r, w)
+				if guest != nil && session.HasUser {
+					// Tell the visitor why they have to sign in again.
+					_ = s.store.SetFlash(ctx, guest.ID, "error", "Your session timed out. Please sign in again.")
 				}
-				return session, nil
+				return guest, nil
 			}
-		} else if !errors.Is(err, store.ErrNotFound) {
+
+			// Every request restarts the idle clock. The cookie is written
+			// again with the new expiry, so the browser never drops a
+			// session that the server still considers alive.
+			expires, err := s.store.TouchSession(ctx, session.ID, s.ttl)
+			if err == nil {
+				session.ExpiresAt = expires
+			}
+			s.SetCookie(w, session)
+
+			if session.HasUser {
+				user, err := s.store.GetUserByID(ctx, session.UserID)
+				if err == nil {
+					return session, user
+				}
+				// The account was deleted while the session was alive.
+				_ = s.store.DeleteSession(ctx, session.ID)
+				return s.createGuest(ctx, r, w)
+			}
+			return session, nil
+		}
+		if !errors.Is(err, store.ErrNotFound) {
 			// A database problem should not log the visitor out, but it also
 			// must not leak a stale session.
 			_ = err
@@ -97,14 +112,22 @@ func (s *Sessions) createGuest(ctx context.Context, r *http.Request, w http.Resp
 	return session, nil
 }
 
-// SetCookie writes the session cookie.
+// SetCookie writes the session cookie. Its lifetime is the same as the
+// lifetime of the session, so the browser and the server always agree on when
+// the visitor is signed out.
 func (s *Sessions) SetCookie(w http.ResponseWriter, session *store.Session) {
+	maxAge := int(time.Until(session.ExpiresAt).Round(time.Second).Seconds())
+	if maxAge < 1 {
+		// A zero Max-Age would turn the cookie into a session cookie that
+		// lives until the browser is closed.
+		maxAge = 1
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     s.cookieName,
 		Value:    session.ID,
 		Path:     "/",
 		Expires:  session.ExpiresAt,
-		MaxAge:   int(time.Until(session.ExpiresAt).Seconds()),
+		MaxAge:   maxAge,
 		HttpOnly: true,
 		Secure:   s.secure,
 		SameSite: http.SameSiteLaxMode,

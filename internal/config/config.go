@@ -21,7 +21,9 @@ type Config struct {
 	DBPath string
 	// CookieSecure marks session cookies as Secure (required behind HTTPS).
 	CookieSecure bool
-	// SessionTTL is how long a session stays valid.
+	// SessionTTL is the idle timeout of a session: the user is signed out
+	// after this long without a request. Every request starts the clock
+	// again.
 	SessionTTL time.Duration
 	// SessionCookieName is the name of the session cookie.
 	SessionCookieName string
@@ -45,7 +47,7 @@ func Load() Config {
 		Addr:              env("ADDR", ":8080"),
 		DBPath:            env("DB_PATH", "data/app.db"),
 		CookieSecure:      envBool("COOKIE_SECURE", false),
-		SessionTTL:        envDuration("SESSION_TTL", 7*24*time.Hour),
+		SessionTTL:        envDuration("SESSION_TTL", 30*time.Minute),
 		SessionCookieName: env("SESSION_COOKIE_NAME", "rt_session"),
 		BaseURL:           strings.TrimRight(env("BASE_URL", ""), "/"),
 		AdminUsername:     env("ADMIN_USERNAME", ""),
