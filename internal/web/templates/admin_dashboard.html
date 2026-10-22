@@ -1,0 +1,46 @@
+{{define "content"}}
+<div class="page-head">
+  <h1 class="page-title">Administration</h1>
+  <p class="muted">Everything about the accounts, the lessons and the results.</p>
+</div>
+
+<div class="stat-row">
+  <div class="stat"><span class="stat-value">{{.Stats.Users}}</span><span class="stat-label">Accounts</span></div>
+  <div class="stat"><span class="stat-value">{{.Stats.Admins}}</span><span class="stat-label">Administrators</span></div>
+  <div class="stat"><span class="stat-value">{{.Stats.Lessons}}</span><span class="stat-label">Lessons</span></div>
+  <div class="stat"><span class="stat-value">{{.Stats.Questions}}</span><span class="stat-label">Questions</span></div>
+  <div class="stat"><span class="stat-value">{{.Stats.Attempts}}</span><span class="stat-label">Results</span></div>
+  <div class="stat"><span class="stat-value">{{printf "%.1f" .Stats.AvgScore}}</span><span class="stat-label">Average score</span></div>
+</div>
+
+<div class="quick-links">
+  <a class="btn btn-primary" href="/admin/lessons">Manage lessons</a>
+  <a class="btn btn-ghost" href="/admin/users">Manage accounts</a>
+  <a class="btn btn-ghost" href="/admin/attempts">View results</a>
+  <a class="btn btn-ghost" href="/admin/lessons/new">New lesson</a>
+</div>
+
+<section class="card table-card">
+  <h2 class="panel-title">Latest results</h2>
+  {{if .RecentAttempts}}
+    <table class="table">
+      <thead>
+        <tr><th>Account</th><th>Lesson</th><th>Score</th><th>Submitted</th><th></th></tr>
+      </thead>
+      <tbody>
+        {{range .RecentAttempts}}
+          <tr>
+            <td>{{if .DisplayName}}{{.DisplayName}}{{else}}{{.Username}}{{end}}</td>
+            <td>{{.LessonTitle}}</td>
+            <td><strong>{{.Score}} / {{.Total}}</strong></td>
+            <td class="muted">{{formatDate .SubmittedAt}}</td>
+            <td class="table-actions"><a class="btn btn-small btn-ghost" href="/results/{{.ID}}">Details</a></td>
+          </tr>
+        {{end}}
+      </tbody>
+    </table>
+  {{else}}
+    <p class="muted">No results have been submitted yet.</p>
+  {{end}}
+</section>
+{{end}}

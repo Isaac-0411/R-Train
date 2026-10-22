@@ -1,0 +1,52 @@
+{{define "content"}}
+<div class="page-head">
+  <a class="back-link" href="/admin">← Administration</a>
+  <h1 class="page-title">Results</h1>
+  <p class="muted">Every submitted result. Administrators can delete them.</p>
+</div>
+
+<section class="card">
+  <form method="get" action="/admin/attempts" class="filter-form">
+    <label class="field">
+      <span class="field-label">Filter by lesson</span>
+      <select name="lesson" onchange="this.form.submit()">
+        <option value="">All lessons</option>
+        {{range .Lessons}}
+          <option value="{{.ID}}"{{if eq (printf "%d" .ID) $.LessonFilter}} selected{{end}}>{{.Title}}</option>
+        {{end}}
+      </select>
+    </label>
+    <noscript><button type="submit" class="btn btn-primary">Filter</button></noscript>
+  </form>
+</section>
+
+<section class="card table-card">
+  {{if .Attempts}}
+    <table class="table">
+      <thead>
+        <tr><th>Account</th><th>Lesson</th><th>Score</th><th>Result</th><th>Submitted</th><th></th></tr>
+      </thead>
+      <tbody>
+        {{range .Attempts}}
+          <tr>
+            <td>{{if .DisplayName}}{{.DisplayName}}{{else}}{{.Username}}{{end}}</td>
+            <td>{{.LessonTitle}}</td>
+            <td><strong>{{.Score}} / {{.Total}}</strong></td>
+            <td><span class="badge{{if .Passed}} badge-success{{else}} badge-muted{{end}}">{{if .Passed}}Passed{{else}}Not passed{{end}}</span></td>
+            <td class="muted">{{formatDate .SubmittedAt}}</td>
+            <td class="table-actions">
+              <a class="btn btn-small btn-ghost" href="/results/{{.ID}}">Details</a>
+              <form method="post" action="/admin/attempts/{{.ID}}/delete" class="inline-form">
+                <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                <button type="submit" class="btn btn-small btn-danger" data-confirm="Delete this result?">Delete</button>
+              </form>
+            </td>
+          </tr>
+        {{end}}
+      </tbody>
+    </table>
+  {{else}}
+    <p class="muted">No results have been submitted yet.</p>
+  {{end}}
+</section>
+{{end}}

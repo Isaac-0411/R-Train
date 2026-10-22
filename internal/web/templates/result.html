@@ -1,0 +1,41 @@
+{{define "content"}}
+<div class="result-wrap">
+  <section class="card result-card">
+    <p class="result-label">Your result</p>
+    <p class="result-score">{{.Attempt.Score}} / {{.Attempt.Total}}</p>
+    <p class="result-percent">{{percent .Attempt.Score .Attempt.Total}}%</p>
+
+    <p class="result-meta">
+      {{.Attempt.LessonTitle}} · {{formatDate .Attempt.SubmittedAt}}
+    </p>
+
+    <div class="result-actions">
+      <a class="btn btn-primary btn-lg" href="/">Home</a>
+      <a class="btn btn-ghost" href="/results">All my results</a>
+      {{if .Attempt.LessonID}}
+        <a class="btn btn-ghost" href="/lessons/{{.Attempt.LessonID}}">Read again</a>
+      {{end}}
+    </div>
+  </section>
+
+  {{if .Attempt.Answers}}
+    <section class="card">
+      <h2 class="panel-title">Answer review</h2>
+      <ol class="review-list">
+        {{range .Attempt.Answers}}
+          <li class="review-item{{if .IsCorrect}} is-correct{{else}} is-wrong{{end}}">
+            <p class="review-question">{{.Prompt}}</p>
+            <p class="review-answer">
+              Your answer:
+              <strong>{{if .SelectedText}}{{.SelectedOption}}. {{.SelectedText}}{{else}}not answered{{end}}</strong>
+            </p>
+            {{if not .IsCorrect}}
+              <p class="review-answer">Correct answer: <strong>{{.Correct}}. {{.CorrectText}}</strong></p>
+            {{end}}
+          </li>
+        {{end}}
+      </ol>
+    </section>
+  {{end}}
+</div>
+{{end}}

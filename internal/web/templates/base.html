@@ -1,0 +1,63 @@
+{{define "base"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Title}} · Reading Trainer</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" href="data:,">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="/">
+      <span class="brand-mark" aria-hidden="true">စ</span>
+      <span class="brand-text">Reading Trainer</span>
+    </a>
+
+    <nav class="nav" aria-label="Main navigation">
+      <a href="/" class="nav-link{{if eq .CurrentPath "/"}} is-active{{end}}">Lessons</a>
+      <a href="/results" class="nav-link{{if eq .CurrentPath "/results"}} is-active{{end}}">My results</a>
+      {{if .User}}
+        <a href="/account" class="nav-link{{if eq .CurrentPath "/account"}} is-active{{end}}">Account</a>
+      {{end}}
+      {{if and .User .User.IsAdmin}}
+        <a href="/admin" class="nav-link{{if hasPrefix .CurrentPath "/admin"}} is-active{{end}}">Administration</a>
+      {{end}}
+    </nav>
+
+    <div class="topbar-right">
+      {{if .User}}
+        <span class="user-chip">
+          <span class="user-name">{{.User.FullName}}</span>
+          {{if .User.IsAdmin}}<span class="badge{{if .User.IsRoot}} badge-root{{end}}">{{if .User.IsRoot}}Main admin{{else}}Admin{{end}}</span>{{end}}
+        </span>
+        <form method="post" action="/logout" class="inline-form">
+          <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+          <button type="submit" class="btn btn-ghost btn-small">Sign out</button>
+        </form>
+      {{else}}
+        <a href="/login" class="btn btn-ghost btn-small">Sign in</a>
+      {{end}}
+    </div>
+  </div>
+</header>
+
+<main id="main" class="page">
+  {{if .Flash}}
+    <div class="alert alert-{{if eq .FlashKind "error"}}error{{else}}success{{end}}" role="status">{{.Flash}}</div>
+  {{end}}
+  {{template "content" .}}
+</main>
+
+<footer class="footer">
+  <p>Reading Trainer · Myanmar reading practice</p>
+</footer>
+
+<script src="/static/app.js" defer></script>
+</body>
+</html>
+{{end}}

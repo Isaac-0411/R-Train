@@ -1,0 +1,58 @@
+{{define "content"}}
+<div class="page-head">
+  <h1 class="page-title">My account</h1>
+  <p class="muted">Signed in as <strong>{{.User.Username}}</strong>{{if .User.IsAdmin}} ({{if .User.IsRoot}}main administrator{{else}}administrator{{end}}){{end}}</p>
+</div>
+
+{{if .Errors}}
+  <div class="alert alert-error" role="alert">
+    <ul class="alert-list">
+      {{range .Errors.Messages}}<li>{{.}}</li>{{end}}
+    </ul>
+  </div>
+{{end}}
+
+<div class="two-column">
+  <section class="card">
+    <h2 class="panel-title">Display name</h2>
+    <form method="post" action="/account/name" class="form">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <label class="field">
+        <span class="field-label">Name</span>
+        <input type="text" name="display_name" value="{{.User.DisplayName}}" maxlength="64">
+      </label>
+      <button type="submit" class="btn btn-primary">Save name</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2 class="panel-title">Change password</h2>
+    <form method="post" action="/account/password" class="form" novalidate>
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <label class="field">
+        <span class="field-label">Current password</span>
+        <input type="password" name="current_password" autocomplete="current-password" required>
+        {{if .Errors}}<span class="field-error">{{.Errors.Field "current_password"}}</span>{{end}}
+      </label>
+      <label class="field">
+        <span class="field-label">New password</span>
+        <input type="password" name="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+        {{if .Errors}}<span class="field-error">{{.Errors.Field "password"}}</span>{{end}}
+      </label>
+      <label class="field">
+        <span class="field-label">Confirm new password</span>
+        <input type="password" name="password_confirmation" autocomplete="new-password" minlength="8" maxlength="128" required>
+        {{if .Errors}}<span class="field-error">{{.Errors.Field "password_confirmation"}}</span>{{end}}
+      </label>
+      <button type="submit" class="btn btn-primary">Change password</button>
+    </form>
+  </section>
+</div>
+
+<div class="stat-row">
+  <div class="stat"><span class="stat-value">{{.Stats.Attempts}}</span><span class="stat-label">Attempts</span></div>
+  <div class="stat"><span class="stat-value">{{printf "%.1f" .Stats.AvgScore}}</span><span class="stat-label">Average score</span></div>
+  <div class="stat"><span class="stat-value">{{.Stats.BestScore}}</span><span class="stat-label">Best score</span></div>
+  <div class="stat"><span class="stat-value">{{printf "%.0f" .Stats.PassRate}}%</span><span class="stat-label">Pass rate</span></div>
+</div>
+{{end}}

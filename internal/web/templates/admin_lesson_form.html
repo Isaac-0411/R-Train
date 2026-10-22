@@ -1,0 +1,174 @@
+{{define "content"}}
+<div class="page-head">
+  <a class="back-link" href="/admin/lessons">← All lessons</a>
+  <h1 class="page-title">{{if .IsNew}}New lesson{{else}}Edit lesson{{end}}</h1>
+</div>
+
+{{if .Errors}}
+  <div class="alert alert-error" role="alert">
+    <ul class="alert-list">
+      {{range .Errors.Messages}}<li>{{.}}</li>{{end}}
+    </ul>
+  </div>
+{{end}}
+
+<div class="two-column two-column-wide">
+  <section class="card">
+    <h2 class="panel-title">Lesson details</h2>
+    <form method="post" action="{{if .IsNew}}/admin/lessons{{else}}/admin/lessons/{{.Lesson.ID}}{{end}}" class="form">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+      <label class="field">
+        <span class="field-label">Title</span>
+        <input type="text" name="title" value="{{.Lesson.Title}}" maxlength="120" required>
+        {{if .Errors}}<span class="field-error">{{.Errors.Field "title"}}</span>{{end}}
+      </label>
+
+      <label class="field">
+        <span class="field-label">Short description</span>
+        <input type="text" name="summary" value="{{.Lesson.Summary}}" maxlength="500">
+        {{if .Errors}}<span class="field-error">{{.Errors.Field "summary"}}</span>{{end}}
+      </label>
+
+      <label class="field">
+        <span class="field-label">Myanmar text</span>
+        <textarea name="passage" rows="14" lang="my" class="myanmar-input">{{.Lesson.Passage}}</textarea>
+        <span class="field-hint">This is the passage the learner reads before the questions.</span>
+        {{if .Errors}}<span class="field-error">{{.Errors.Field "passage"}}</span>{{end}}
+      </label>
+
+      <label class="checkbox">
+        <input type="checkbox" name="published" {{if .Lesson.Published}}checked{{end}}>
+        <span>Published (visible on the landing page)</span>
+      </label>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save lesson</button>
+        {{if not .IsNew}}
+          <a class="btn btn-ghost" href="/lessons/{{.Lesson.ID}}">Preview lesson</a>
+        {{end}}
+      </div>
+    </form>
+  </section>
+
+  {{if not .IsNew}}
+    <section class="card" id="questions">
+      <h2 class="panel-title">Questions ({{len .Questions}})</h2>
+
+      {{if .Questions}}
+        <div class="question-admin-list">
+          {{range .Questions}}
+            <article class="question-admin">
+              <header class="question-admin-head">
+                <span class="question-number">{{.Position}}</span>
+                <strong>{{.Prompt}}</strong>
+              </header>
+              <ul class="option-list">
+                <li class="{{if eq .Correct "a"}}is-correct{{end}}"><span>A</span> {{.OptionA}}</li>
+                <li class="{{if eq .Correct "b"}}is-correct{{end}}"><span>B</span> {{.OptionB}}</li>
+                <li class="{{if eq .Correct "c"}}is-correct{{end}}"><span>C</span> {{.OptionC}}</li>
+                <li class="{{if eq .Correct "d"}}is-correct{{end}}"><span>D</span> {{.OptionD}}</li>
+              </ul>
+              <div class="row-actions">
+                <a class="btn btn-small btn-ghost" href="/admin/questions/{{.ID}}/edit">Edit</a>
+                <form method="post" action="/admin/questions/{{.ID}}/move" class="inline-form">
+                  <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                  <input type="hidden" name="direction" value="-1">
+                  <button type="submit" class="btn btn-small btn-ghost">↑ Move up</button>
+                </form>
+                <form method="post" action="/admin/questions/{{.ID}}/move" class="inline-form">
+                  <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                  <input type="hidden" name="direction" value="1">
+                  <button type="submit" class="btn btn-small btn-ghost">↓ Move down</button>
+                </form>
+                <form method="post" action="/admin/questions/{{.ID}}/delete" class="inline-form">
+                  <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                  <button type="submit" class="btn btn-small btn-danger" data-confirm="Delete this question?">Delete</button>
+                </form>
+              </div>
+            </article>
+          {{end}}
+        </div>
+      {{else}}
+        <p class="muted">No questions yet. Add the first one below.</p>
+      {{end}}
+
+      {{$prompt := ""}}
+      {{$optionA := ""}}
+      {{$optionB := ""}}
+      {{$optionC := ""}}
+      {{$optionD := ""}}
+      {{$correct := ""}}
+      {{if .EditQuestion}}
+        {{$prompt = .EditQuestion.Prompt}}
+        {{$optionA = .EditQuestion.OptionA}}
+        {{$optionB = .EditQuestion.OptionB}}
+        {{$optionC = .EditQuestion.OptionC}}
+        {{$optionD = .EditQuestion.OptionD}}
+        {{$correct = .EditQuestion.Correct}}
+      {{end}}
+      {{if .FormValues}}
+        {{$prompt = index .FormValues "prompt"}}
+        {{$optionA = index .FormValues "option_a"}}
+        {{$optionB = index .FormValues "option_b"}}
+        {{$optionC = index .FormValues "option_c"}}
+        {{$optionD = index .FormValues "option_d"}}
+        {{$correct = index .FormValues "correct_option"}}
+      {{end}}
+
+      <h3 class="panel-title panel-title-sub">{{if .EditQuestion}}Edit question{{else}}Add a question{{end}}</h3>
+      <form method="post" action="{{if .EditQuestion}}/admin/questions/{{.EditQuestion.ID}}{{else}}/admin/lessons/{{.Lesson.ID}}/questions{{end}}" class="form">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+        <label class="field">
+          <span class="field-label">Question</span>
+          <textarea name="prompt" rows="2" required>{{$prompt}}</textarea>
+          {{if .Errors}}<span class="field-error">{{.Errors.Field "prompt"}}</span>{{end}}
+        </label>
+
+        <div class="option-grid">
+          <label class="field">
+            <span class="field-label">Option A</span>
+            <input type="text" name="option_a" value="{{$optionA}}" maxlength="500" required>
+            {{if .Errors}}<span class="field-error">{{.Errors.Field "option_a"}}</span>{{end}}
+          </label>
+          <label class="field">
+            <span class="field-label">Option B</span>
+            <input type="text" name="option_b" value="{{$optionB}}" maxlength="500" required>
+            {{if .Errors}}<span class="field-error">{{.Errors.Field "option_b"}}</span>{{end}}
+          </label>
+          <label class="field">
+            <span class="field-label">Option C</span>
+            <input type="text" name="option_c" value="{{$optionC}}" maxlength="500" required>
+            {{if .Errors}}<span class="field-error">{{.Errors.Field "option_c"}}</span>{{end}}
+          </label>
+          <label class="field">
+            <span class="field-label">Option D</span>
+            <input type="text" name="option_d" value="{{$optionD}}" maxlength="500" required>
+            {{if .Errors}}<span class="field-error">{{.Errors.Field "option_d"}}</span>{{end}}
+          </label>
+        </div>
+
+        <label class="field">
+          <span class="field-label">Correct answer</span>
+          <select name="correct_option" required>
+            <option value="" disabled{{if eq $correct ""}} selected{{end}}>Choose the correct option</option>
+            <option value="a"{{if eq $correct "a"}} selected{{end}}>A</option>
+            <option value="b"{{if eq $correct "b"}} selected{{end}}>B</option>
+            <option value="c"{{if eq $correct "c"}} selected{{end}}>C</option>
+            <option value="d"{{if eq $correct "d"}} selected{{end}}>D</option>
+          </select>
+          {{if .Errors}}<span class="field-error">{{.Errors.Field "correct_option"}}</span>{{end}}
+        </label>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">{{if .EditQuestion}}Save question{{else}}Add question{{end}}</button>
+          {{if .EditQuestion}}
+            <a class="btn btn-ghost" href="/admin/lessons/{{.Lesson.ID}}/edit#questions">Cancel</a>
+          {{end}}
+        </div>
+      </form>
+    </section>
+  {{end}}
+</div>
+{{end}}

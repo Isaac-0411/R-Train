@@ -1,0 +1,17 @@
+{{define "content"}}
+<div class="page-head">
+  <a class="back-link" href="/">← All lessons</a>
+  <h1 class="page-title">{{.Lesson.Title}}</h1>
+  {{if .Lesson.Summary}}<p class="muted">{{.Lesson.Summary}}</p>{{end}}
+</div>
+
+<section class="card reading-card">
+  <h2 class="panel-title">Myanmar text</h2>
+  <div class="passage" lang="my">{{.Lesson.Passage}}</div>
+</section>
+
+<div class="page-actions">
+  <span class="muted">{{.QuestionCount}} question{{if ne .QuestionCount 1}}s{{end}} in this lesson</span>
+  <a class="btn btn-primary btn-lg" href="/lessons/{{.Lesson.ID}}/quiz">Next →</a>
+</div>
+{{end}}

@@ -1,0 +1,22 @@
+# Build artefacts
+/bin/
+/dist/
+/readingtrainer
+/rt-server
+/adminctl
+
+# Database and runtime data
+/data/
+*.db
+*.db-shm
+*.db-wal
+
+# Environment and secrets
+.env
+.env.local
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.swp
+.DS_Store

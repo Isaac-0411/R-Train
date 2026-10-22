@@ -1,0 +1,39 @@
+{{define "content"}}
+<div class="page-head">
+  <h1 class="page-title">My results</h1>
+  <p class="muted">Every result you submitted is stored here.</p>
+</div>
+
+<div class="stat-row">
+  <div class="stat"><span class="stat-value">{{.Stats.Attempts}}</span><span class="stat-label">Attempts</span></div>
+  <div class="stat"><span class="stat-value">{{printf "%.1f" .Stats.AvgScore}}</span><span class="stat-label">Average score</span></div>
+  <div class="stat"><span class="stat-value">{{.Stats.BestScore}}</span><span class="stat-label">Best score</span></div>
+  <div class="stat"><span class="stat-value">{{printf "%.0f" .Stats.PassRate}}%</span><span class="stat-label">Pass rate</span></div>
+</div>
+
+{{if .Attempts}}
+  <section class="card table-card">
+    <table class="table">
+      <thead>
+        <tr><th>Lesson</th><th>Score</th><th>Result</th><th>Submitted</th><th></th></tr>
+      </thead>
+      <tbody>
+        {{range .Attempts}}
+          <tr>
+            <td>{{.LessonTitle}}</td>
+            <td><strong>{{.Score}} / {{.Total}}</strong></td>
+            <td><span class="badge{{if .Passed}} badge-success{{else}} badge-muted{{end}}">{{if .Passed}}Passed{{else}}Not passed{{end}}</span></td>
+            <td class="muted">{{formatDate .SubmittedAt}}</td>
+            <td class="table-actions"><a class="btn btn-small btn-ghost" href="/results/{{.ID}}">Details</a></td>
+          </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </section>
+{{else}}
+  <div class="card empty-state">
+    <p>You have not submitted a lesson yet.</p>
+    <a class="btn btn-primary" href="/">Go to the lessons</a>
+  </div>
+{{end}}
+{{end}}

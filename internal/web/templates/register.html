@@ -1,0 +1,54 @@
+{{define "content"}}
+<div class="auth-layout">
+  <section class="card auth-card">
+    <h1 class="page-title">Create account</h1>
+    <p class="muted">New accounts are standard learner accounts. Administrator accounts are created by the main administrator.</p>
+
+    {{if .Errors}}
+      <div class="alert alert-error" role="alert">
+        <ul class="alert-list">
+          {{range .Errors.Messages}}<li>{{.}}</li>{{end}}
+        </ul>
+      </div>
+    {{end}}
+
+    <form method="post" action="/register" class="form" novalidate data-validate="register">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+      <label class="field">
+        <span class="field-label">Username</span>
+        <input type="text" name="username" value="{{.Username}}" autocomplete="username" minlength="3" maxlength="32"
+               pattern="[A-Za-z0-9._\-]{3,32}" required>
+        <span class="field-hint">3–32 characters: letters, numbers, dot, dash or underscore.</span>
+        {{if .Errors}}<span class="field-error">{{.Errors.Field "username"}}</span>{{end}}
+      </label>
+
+      <label class="field">
+        <span class="field-label">Display name <span class="muted">(optional)</span></span>
+        <input type="text" name="display_name" value="{{.DisplayName}}" autocomplete="name" maxlength="64">
+        {{if .Errors}}<span class="field-error">{{.Errors.Field "display_name"}}</span>{{end}}
+      </label>
+
+      <label class="field">
+        <span class="field-label">Password</span>
+        <span class="input-with-button">
+          <input type="password" name="password" autocomplete="new-password" minlength="8" maxlength="128" required>
+          <button type="button" class="btn btn-ghost btn-small" data-toggle-password="password">Show</button>
+        </span>
+        <span class="field-hint">At least 8 characters.</span>
+        {{if .Errors}}<span class="field-error">{{.Errors.Field "password"}}</span>{{end}}
+      </label>
+
+      <label class="field">
+        <span class="field-label">Confirm password</span>
+        <input type="password" name="password_confirmation" autocomplete="new-password" minlength="8" maxlength="128" required>
+        {{if .Errors}}<span class="field-error">{{.Errors.Field "password_confirmation"}}</span>{{end}}
+      </label>
+
+      <button type="submit" class="btn btn-primary btn-block">Create account</button>
+    </form>
+
+    <p class="auth-switch">Already have an account? <a href="/login">Sign in</a></p>
+  </section>
+</div>
+{{end}}

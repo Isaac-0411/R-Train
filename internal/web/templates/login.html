@@ -1,0 +1,34 @@
+{{define "content"}}
+<div class="auth-layout">
+  <section class="card auth-card">
+    <h1 class="page-title">Sign in</h1>
+    <p class="muted">Use your account to open the lessons.</p>
+
+    {{if .Message}}
+      <div class="alert alert-error" role="alert">{{.Message}}</div>
+    {{end}}
+
+    <form method="post" action="/login" class="form" novalidate data-validate="login">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <input type="hidden" name="next" value="{{.Next}}">
+
+      <label class="field">
+        <span class="field-label">Username</span>
+        <input type="text" name="username" value="{{.Username}}" autocomplete="username" required autofocus>
+      </label>
+
+      <label class="field">
+        <span class="field-label">Password</span>
+        <span class="input-with-button">
+          <input type="password" name="password" autocomplete="current-password" required>
+          <button type="button" class="btn btn-ghost btn-small" data-toggle-password="password">Show</button>
+        </span>
+      </label>
+
+      <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+    </form>
+
+    <p class="auth-switch">No account yet? <a href="/register">Create one</a></p>
+  </section>
+</div>
+{{end}}

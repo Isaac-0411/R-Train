@@ -1,0 +1,62 @@
+{{define "content"}}
+<div class="page-head">
+  <a class="back-link" href="/lessons/{{.Lesson.ID}}">← Back to the text</a>
+  <h1 class="page-title">{{.Lesson.Title}}</h1>
+</div>
+
+{{if .Message}}
+  <div class="alert alert-error" role="alert">{{.Message}}</div>
+{{end}}
+
+<form method="post" action="/lessons/{{.Lesson.ID}}/submit" class="quiz-form" id="quizForm" novalidate>
+  <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+  <div class="quiz-layout">
+    <aside class="passage-panel card">
+      <h2 class="panel-title">Myanmar text</h2>
+      <div class="passage" lang="my">{{.Lesson.Passage}}</div>
+    </aside>
+
+    <section class="questions-panel card">
+      <div class="box-header">
+        <div>
+          <h2 class="panel-title">Questions</h2>
+          <p class="muted small" id="boxRange">Questions 1–{{len .Boxes}}</p>
+        </div>
+        <div class="box-nav">
+          <button type="button" class="btn btn-icon" id="prevBox" aria-label="Previous box">‹</button>
+          <span class="box-counter" id="boxLabel">Box 1 of {{len .Boxes}}</span>
+          <button type="button" class="btn btn-icon" id="nextBox" aria-label="Next box">›</button>
+        </div>
+      </div>
+
+      {{range $box := .Boxes}}
+        <div class="qbox{{if eq $box.Index 0}} is-active{{end}}" data-box="{{$box.Index}}" data-from="{{$box.From}}" data-to="{{$box.To}}" data-total="{{$.Total}}"{{if ne $box.Index 0}} hidden{{end}}>
+          {{range $offset, $question := $box.Questions}}
+            <fieldset class="question">
+              <legend class="question-legend">
+                <span class="question-number">{{add $box.From $offset}}</span>
+                <span class="question-text">{{$question.Prompt}}</span>
+              </legend>
+              <div class="options">
+                {{range $optionIndex, $option := $question.Options}}
+                  <label class="option">
+                    <input type="radio" name="q_{{$question.ID}}" value="{{optionLetter $optionIndex}}" required>
+                    <span class="option-letter">{{optionLetter $optionIndex}}</span>
+                    <span class="option-text">{{$option}}</span>
+                  </label>
+                {{end}}
+              </div>
+            </fieldset>
+          {{end}}
+        </div>
+      {{end}}
+
+      <div class="quiz-footer">
+        <span class="quiz-hint" id="quizHint"></span>
+        <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">Submit</button>
+      </div>
+    </section>
+  </div>
+</form>
+{{end}}

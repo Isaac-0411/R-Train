@@ -1,0 +1,50 @@
+{{define "content"}}
+<div class="page-head">
+  <a class="back-link" href="/admin">← Administration</a>
+  <h1 class="page-title">Lessons</h1>
+</div>
+
+<section class="card table-card">
+  {{if .Lessons}}
+    <table class="table">
+      <thead>
+        <tr><th>Lesson</th><th>Text</th><th>Questions</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        {{range $index, $lesson := .Lessons}}
+          <tr>
+            <td>
+              <strong>{{$lesson.Title}}</strong>
+              <span class="muted small">Lesson {{add $index 1}}</span>
+            </td>
+            <td class="muted">{{if $lesson.Passage}}{{len .Passage}} characters{{else}}—{{end}}</td>
+            <td>{{$lesson.QuestionCount}}</td>
+            <td>
+              {{if $lesson.Published}}
+                <span class="badge badge-success">Published</span>
+              {{else}}
+                <span class="badge badge-muted">Hidden</span>
+              {{end}}
+            </td>
+            <td class="table-actions">
+              <a class="btn btn-small btn-ghost" href="/admin/lessons/{{$lesson.ID}}/edit">Edit</a>
+              <a class="btn btn-small btn-ghost" href="/lessons/{{$lesson.ID}}">View</a>
+              <form method="post" action="/admin/lessons/{{$lesson.ID}}/delete" class="inline-form">
+                <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                <button type="submit" class="btn btn-small btn-danger"
+                        data-confirm="Delete the lesson {{$lesson.Title}}? Its questions and results are removed too.">Delete</button>
+              </form>
+            </td>
+          </tr>
+        {{end}}
+      </tbody>
+    </table>
+  {{else}}
+    <p class="muted">No lessons yet.</p>
+  {{end}}
+</section>
+
+<div class="quick-links">
+  <a class="btn btn-primary" href="/admin/lessons/new">New lesson</a>
+</div>
+{{end}}

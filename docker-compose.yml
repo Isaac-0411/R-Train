@@ -1,0 +1,28 @@
+services:
+  app:
+    build: .
+    image: reading-trainer:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ADDR: ":8080"
+      DB_PATH: "/data/app.db"
+      # Set to true as soon as the site is served over HTTPS.
+      COOKIE_SECURE: "false"
+      LOG_LEVEL: "info"
+      # Bootstrap the main administrator on the very first start.
+      # Afterwards these variables are ignored.
+      ADMIN_USERNAME: "${ADMIN_USERNAME:-}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-}"
+      ADMIN_DISPLAY_NAME: "${ADMIN_DISPLAY_NAME:-Administrator}"
+    volumes:
+      - app-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  app-data:

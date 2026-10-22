@@ -1,0 +1,120 @@
+{{define "content"}}
+<div class="page-head">
+  <h1 class="page-title">Accounts</h1>
+  <p class="muted">
+    {{if .User.IsRoot}}
+      You are the main administrator: you can create administrator accounts and you can never be deleted.
+    {{else}}
+      You can create learner accounts and delete accounts. Only the main administrator can create administrator accounts.
+    {{end}}
+  </p>
+</div>
+
+{{if .Errors}}
+  <div class="alert alert-error" role="alert">
+    <ul class="alert-list">
+      {{range .Errors.Messages}}<li>{{.}}</li>{{end}}
+    </ul>
+  </div>
+{{end}}
+
+<div class="two-column two-column-wide">
+  <section class="card table-card">
+    <h2 class="panel-title">All accounts</h2>
+    <table class="table">
+      <thead>
+        <tr><th>Account</th><th>Type</th><th>Created</th><th></th></tr>
+      </thead>
+      <tbody>
+        {{range .Users}}
+          <tr>
+            <td>
+              <span class="account-name">{{if .DisplayName}}{{.DisplayName}}{{else}}{{.Username}}{{end}}</span>
+              <span class="muted small">@{{.Username}}</span>
+              {{if .IsRoot}}<span class="badge badge-root">Main admin</span>{{end}}
+            </td>
+            <td>
+              {{if .IsAdmin}}
+                <form method="post" action="/admin/users/{{.ID}}/role" class="inline-form">
+                  <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                  <select name="role" {{if not $.User.IsRoot}}disabled{{end}}>
+                    <option value="admin"{{if .IsAdmin}} selected{{end}}>Admin</option>
+                    <option value="user"{{if not .IsAdmin}} selected{{end}}>Learner</option>
+                  </select>
+                  {{if $.User.IsRoot}}<button type="submit" class="btn btn-small btn-ghost">Save</button>{{end}}
+                </form>
+              {{else}}
+                <span class="badge badge-muted">Learner</span>
+              {{end}}
+            </td>
+            <td class="muted">{{formatDateShort .CreatedAt}}</td>
+            <td class="table-actions">
+              {{if not .IsRoot}}
+                <form method="post" action="/admin/users/{{.ID}}/password" class="inline-form">
+                  <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                  <input type="password" name="password" placeholder="New password" minlength="8" maxlength="128"
+                         autocomplete="new-password" required>
+                  <button type="submit" class="btn btn-small btn-ghost">Reset</button>
+                </form>
+                {{if ne .ID $.User.ID}}
+                  <form method="post" action="/admin/users/{{.ID}}/delete" class="inline-form">
+                    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                    <button type="submit" class="btn btn-small btn-danger"
+                            data-confirm="Delete the account {{.Username}}? All of their results are removed too.">Delete</button>
+                  </form>
+                {{end}}
+              {{else}}
+                <span class="muted small">Protected</span>
+              {{end}}
+            </td>
+          </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2 class="panel-title">Create an account</h2>
+    <form method="post" action="/admin/users" class="form" novalidate>
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+      <label class="field">
+        <span class="field-label">Username</span>
+        <input type="text" name="username" value="{{.Username}}" minlength="3" maxlength="32"
+               pattern="[A-Za-z0-9._\-]{3,32}" required>
+        {{if .Errors}}<span class="field-error">{{.Errors.Field "username"}}</span>{{end}}
+      </label>
+
+      <label class="field">
+        <span class="field-label">Display name</span>
+        <input type="text" name="display_name" value="{{.DisplayName}}" maxlength="64">
+      </label>
+
+      <label class="field">
+        <span class="field-label">Account type</span>
+        <select name="role">
+          <option value="user"{{if eq .Role "user"}} selected{{end}}>Learner</option>
+          {{if .User.IsRoot}}
+            <option value="admin"{{if eq .Role "admin"}} selected{{end}}>Administrator</option>
+          {{end}}
+        </select>
+        {{if .Errors}}<span class="field-error">{{.Errors.Field "role"}}</span>{{end}}
+      </label>
+
+      <label class="field">
+        <span class="field-label">Password</span>
+        <input type="password" name="password" minlength="8" maxlength="128" autocomplete="new-password" required>
+        {{if .Errors}}<span class="field-error">{{.Errors.Field "password"}}</span>{{end}}
+      </label>
+
+      <label class="field">
+        <span class="field-label">Confirm password</span>
+        <input type="password" name="password_confirmation" minlength="8" maxlength="128" autocomplete="new-password" required>
+        {{if .Errors}}<span class="field-error">{{.Errors.Field "password_confirmation"}}</span>{{end}}
+      </label>
+
+      <button type="submit" class="btn btn-primary">Create account</button>
+    </form>
+  </section>
+</div>
+{{end}}

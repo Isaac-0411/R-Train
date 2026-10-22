@@ -1,0 +1,26 @@
+{{define "content"}}
+<div class="page-head">
+  <h1 class="page-title">Lessons</h1>
+  <p class="muted">Pick a lesson and read the Myanmar text first.</p>
+</div>
+
+{{if .Lessons}}
+  <div class="lesson-grid">
+    {{range $index, $lesson := .Lessons}}
+      <a class="lesson-card" href="/lessons/{{$lesson.ID}}">
+        <span class="lesson-number">Lesson {{add $index 1}}</span>
+        <span class="lesson-title">{{$lesson.Title}}</span>
+        {{if $lesson.Summary}}<span class="lesson-summary">{{$lesson.Summary}}</span>{{end}}
+        <span class="lesson-meta">{{$lesson.QuestionCount}} question{{if ne $lesson.QuestionCount 1}}s{{end}}</span>
+      </a>
+    {{end}}
+  </div>
+{{else}}
+  <div class="card empty-state">
+    <p>No lessons have been published yet.</p>
+    {{if and .User .User.IsAdmin}}
+      <a class="btn btn-primary" href="/admin/lessons/new">Create the first lesson</a>
+    {{end}}
+  </div>
+{{end}}
+{{end}}
