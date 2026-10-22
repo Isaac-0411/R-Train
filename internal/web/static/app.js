@@ -19,19 +19,23 @@
     var prevBtn = document.getElementById("prevBox");
     var nextBtn = document.getElementById("nextBox");
     var hint = document.getElementById("quizHint");
+    var progress = document.getElementById("boxProgress");
+    var progressBar = document.getElementById("boxProgressBar");
     var current = 0;
 
     // The arrow buttons move through the questions. The page only scrolls
-    // when the question is not on the screen, so the text can be read in
-    // peace: nothing jumps around while the question is already visible.
+    // when the question card is not on the screen, so the text can be read
+    // in peace: nothing jumps around while the card is already visible, and
+    // the step, the arrows and the progress stay in reach.
     function ensureQuestionVisible(box) {
       if (!box) return;
 
+      var target = box.closest ? (box.closest(".questions-panel") || box) : box;
       var topbar = document.querySelector(".topbar");
       var margin = (topbar ? topbar.getBoundingClientRect().bottom : 0) + 16;
-      var rect = box.getBoundingClientRect();
+      var rect = target.getBoundingClientRect();
 
-      if (rect.top >= margin && rect.bottom <= window.innerHeight) return;
+      if (rect.top >= margin && rect.top <= window.innerHeight) return;
 
       var top = rect.top + window.pageYOffset - margin;
       if (top < 0) top = 0;
@@ -50,6 +54,12 @@
       });
 
       if (label) label.textContent = "Question " + (index + 1) + " of " + boxes.length;
+      if (progress) {
+        progress.setAttribute("aria-valuemax", String(boxes.length));
+        progress.setAttribute("aria-valuenow", String(index + 1));
+        progress.setAttribute("aria-valuetext", "Question " + (index + 1) + " of " + boxes.length);
+      }
+      if (progressBar) progressBar.style.width = ((index + 1) / boxes.length * 100) + "%";
       if (prevBtn) prevBtn.disabled = index === 0;
       if (nextBtn) nextBtn.disabled = index === boxes.length - 1;
 

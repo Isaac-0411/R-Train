@@ -14,6 +14,7 @@
   --primary: #2563eb;
   --primary-dark: #1d4ed8;
   --primary-soft: #eff4ff;
+  --primary-wash: #e8f0ff;
   --on-primary: #ffffff;
   --success: #15803d;
   --success-soft: #e8f7ee;
@@ -46,6 +47,7 @@
     --primary: #60a5fa;
     --primary-dark: #3b82f6;
     --primary-soft: #1e293b;
+    --primary-wash: #26374f;
     --on-primary: #0b1220;
     --success: #4ade80;
     --success-soft: #14321f;
@@ -68,6 +70,7 @@
   --primary: #60a5fa;
   --primary-dark: #3b82f6;
   --primary-soft: #1e293b;
+  --primary-wash: #26374f;
   --on-primary: #0b1220;
   --success: #4ade80;
   --success-soft: #14321f;
@@ -474,46 +477,119 @@ input:disabled, select:disabled { opacity: .6; cursor: not-allowed; }
 /* The cards of the quiz sit in a grid, so the card margin is not needed. */
 .quiz-layout > .card { margin-bottom: 0; }
 
-.questions-panel { display: flex; flex-direction: column; }
-
-.box-header {
+/* The question card is one surface: a small head with the step, the arrows
+   and a progress bar, then the question and its answers, then the footer. */
+.questions-panel {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-  flex-wrap: wrap;
-  margin-bottom: 1rem;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
 }
 
-.box-nav { display: flex; align-items: center; gap: .5rem; }
-.box-counter { font-size: .9rem; font-weight: 600; color: var(--text-muted); min-width: 5.5rem; text-align: center; }
+.quiz-head {
+  padding: 1.1rem 1.35rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
 
-.qbox { display: flex; flex-direction: column; gap: 1rem; }
+.quiz-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.quiz-heading {
+  margin: 0;
+  font-size: .78rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.box-nav { display: flex; align-items: center; gap: .45rem; }
+
+.quiz-form .box-nav .btn-icon {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 1.35rem;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.quiz-form .box-nav .btn-icon:hover:not(:disabled) {
+  background: var(--primary-wash);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn:disabled:active { transform: none; }
+
+.quiz-progress {
+  height: .4rem;
+  margin-top: .85rem;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+.quiz-progress-bar {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+  transition: width .28s ease;
+}
+
+.qbox {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.35rem 1.35rem 0;
+}
 .qbox[hidden] { display: none; }
 
+/* The question is plain text inside the card, not a card of its own. */
 .question {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 1.1rem 1.25rem 1.25rem;
+  min-width: 0;
   margin: 0;
-  background: var(--surface-alt);
-}
-
-.question.is-missing {
-  border-color: var(--danger);
-  background: var(--danger-soft);
-}
-
-.question-legend {
-  display: flex;
-  gap: .6rem;
-  align-items: flex-start;
-  font-weight: 600;
   padding: 0;
-  margin-bottom: .6rem;
-  width: 100%;
+  border: 0;
+  background: none;
 }
 
+.quiz-form .question-legend {
+  display: flex;
+  align-items: flex-start;
+  gap: .7rem;
+  width: 100%;
+  margin: 0 0 1.1rem;
+  padding: 0;
+  font-size: 1.12rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.quiz-form .question-number {
+  display: inline-grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  margin-top: .1rem;
+  border-radius: 9px;
+  background: var(--primary-wash);
+  color: var(--primary);
+  font-size: .8rem;
+  font-weight: 700;
+  flex: none;
+}
+
+.quiz-form .question.is-missing .question-number { background: var(--danger-soft); color: var(--danger); }
+.quiz-form .question.is-missing .question-text { color: var(--danger); }
+
+/* These two badges are also used by the administrator pages, so the quiz
+   look is layered on top of the shared base instead of replacing it. */
 .question-number {
   display: inline-grid;
   place-items: center;
@@ -525,22 +601,6 @@ input:disabled, select:disabled { opacity: .6; cursor: not-allowed; }
   font-size: .82rem;
   flex: none;
 }
-.question-text { flex: 1; }
-
-.options { display: grid; gap: .45rem; }
-
-.option {
-  display: flex;
-  align-items: flex-start;
-  gap: .6rem;
-  padding: .5rem .6rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid transparent;
-  cursor: pointer;
-}
-.option:hover { background: var(--primary-soft); }
-.option input { margin-top: .3rem; accent-color: var(--primary); flex: none; }
-.option:has(input:checked) { background: var(--primary-soft); border-color: var(--primary); }
 
 .option-letter {
   display: inline-grid;
@@ -554,15 +614,97 @@ input:disabled, select:disabled { opacity: .6; cursor: not-allowed; }
   font-weight: 700;
   flex: none;
 }
-.option:has(input:checked) .option-letter { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+
+.question-text { flex: 1; }
+
+.options { display: grid; gap: .55rem; }
+
+.option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .75rem .9rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.option:hover { border-color: var(--primary); background: var(--primary-wash); }
+.option:has(input:checked) {
+  border-color: var(--primary);
+  background: var(--primary-wash);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+.option:has(input:focus-visible) { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* The radio itself is kept for the keyboard and for the form, but the row
+   draws the choice by hand so it matches the rest of the page. */
+.option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.quiz-form .option-letter {
+  display: inline-grid;
+  place-items: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-alt);
+  color: var(--text-muted);
+  font-size: .78rem;
+  font-weight: 700;
+  flex: none;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.option:has(input:checked) .option-letter {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
+}
+
+.option-text { flex: 1; line-height: 1.5; }
+
+.option-mark {
+  position: relative;
+  width: 1.15rem;
+  height: 1.15rem;
+  border: 2px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  flex: none;
+  transition: background .15s ease, border-color .15s ease;
+}
+.option:has(input:checked) .option-mark {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+.option:has(input:checked) .option-mark::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 47%;
+  width: .26rem;
+  height: .5rem;
+  border: solid var(--on-primary);
+  border-width: 0 2px 2px 0;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
 
 .quiz-footer {
   display: flex;
-  justify-content: flex-end;
   align-items: center;
+  justify-content: space-between;
   gap: 1rem;
-  margin-top: 1.25rem;
-  padding-top: 1rem;
+  margin: 1.35rem 1.35rem 0;
+  padding: 1rem 0 1.35rem;
   border-top: 1px solid var(--border);
 }
 .quiz-hint { color: var(--text-muted); font-size: .88rem; margin-right: auto; }
@@ -673,7 +815,16 @@ input:disabled, select:disabled { opacity: .6; cursor: not-allowed; }
   .brand-text { display: none; }
   .page { padding: 1.25rem .9rem 2.5rem; }
   .result-score { font-size: 2.6rem; }
-  .quiz-footer { flex-direction: column; align-items: stretch; }
+  .quiz-head { padding: .95rem 1rem .9rem; }
+  .qbox { padding: 1.15rem 1rem 0; }
+  .quiz-form .question-legend { font-size: 1.05rem; }
+  .option { gap: .6rem; padding: .7rem .8rem; }
+  .quiz-footer {
+    flex-direction: column;
+    align-items: stretch;
+    margin: 1.15rem 1rem 0;
+    padding-bottom: 1rem;
+  }
   .quiz-footer .btn { width: 100%; }
   .quiz-hint { margin-right: 0; text-align: center; }
 }

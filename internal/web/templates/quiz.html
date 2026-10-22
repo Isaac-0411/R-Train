@@ -21,15 +21,17 @@
     </section>
 
     <section class="questions-panel card">
-      <div class="box-header">
-        <div>
-          <h2 class="panel-title">Questions</h2>
-          <p class="muted small" id="boxRange">{{.Total}} question{{if ne .Total 1}}s{{end}} in this lesson</p>
+      <div class="quiz-head">
+        <div class="quiz-head-row">
+          <h2 class="quiz-heading" id="boxLabel" aria-live="polite">Question 1 of {{.Total}}</h2>
+          <div class="box-nav">
+            <button type="button" class="btn btn-icon" id="prevBox" aria-label="Previous question">‹</button>
+            <button type="button" class="btn btn-icon" id="nextBox" aria-label="Next question">›</button>
+          </div>
         </div>
-        <div class="box-nav">
-          <button type="button" class="btn btn-icon" id="prevBox" aria-label="Previous question">‹</button>
-          <span class="box-counter" id="boxLabel">Question 1 of {{.Total}}</span>
-          <button type="button" class="btn btn-icon" id="nextBox" aria-label="Next question">›</button>
+        <div class="quiz-progress" id="boxProgress" role="progressbar" aria-label="Question progress"
+             aria-valuemin="1" aria-valuemax="{{.Total}}" aria-valuenow="1">
+          <span class="quiz-progress-bar" id="boxProgressBar" style="width: {{percent 1 .Total}}%"></span>
         </div>
       </div>
 
@@ -47,6 +49,7 @@
                     <input type="radio" name="q_{{$question.ID}}" value="{{optionLetter $optionIndex}}" required>
                     <span class="option-letter">{{optionLetter $optionIndex}}</span>
                     <span class="option-text">{{$option}}</span>
+                    <span class="option-mark" aria-hidden="true"></span>
                   </label>
                 {{end}}
               </div>
