@@ -361,6 +361,47 @@ func TestExpiredSessionSignsTheUserOut(t *testing.T) {
 	}
 }
 
+func TestSessionTouchKeepsTheUserSignedIn(t *testing.T) {
+	const ttl = 45 * time.Minute
+
+	srv := newTestServerWith(t, func(cfg *config.Config) { cfg.SessionTTL = ttl })
+	client := newClient(t, srv.URL)
+	client.register("alice", "Password123")
+
+	token := client.token("/")
+	id := onlySessionID(t, srv)
+	soon := store.Now().Add(time.Minute).Format(time.RFC3339)
+	if _, err := srv.store.DB().ExecContext(t.Context(),
+		`UPDATE sessions SET expires_at = ? WHERE id = ?`, soon, id); err != nil {
+		t.Fatalf("move the expiry: %v", err)
+	}
+
+	status, _ := client.post("/session/touch", url.Values{"csrf_token": {token}})
+	if status != http.StatusNoContent {
+		t.Fatalf("POST /session/touch returned %d, want %d", status, http.StatusNoContent)
+	}
+
+	var stored string
+	if err := srv.store.DB().QueryRowContext(t.Context(),
+		`SELECT expires_at FROM sessions WHERE id = ?`, id).Scan(&stored); err != nil {
+		t.Fatalf("read the expiry: %v", err)
+	}
+	expires, err := time.Parse(time.RFC3339, stored)
+	if err != nil {
+		t.Fatalf("parse the expiry %q: %v", stored, err)
+	}
+	if remaining := time.Until(expires); remaining < ttl-time.Minute {
+		t.Errorf("the keep-alive did not extend the session, it expires in %v", remaining)
+	}
+
+	// An anonymous visitor cannot extend a session this way.
+	anon := newClient(t, srv.URL)
+	status, _ = anon.post("/session/touch", url.Values{"csrf_token": {anon.token("/login")}})
+	if status != http.StatusSeeOther {
+		t.Errorf("an anonymous keep-alive returned %d, want %d", status, http.StatusSeeOther)
+	}
+}
+
 func TestRegistrationValidatesTheInput(t *testing.T) {
 	srv := newTestServer(t)
 

@@ -21,6 +21,7 @@
   </script>
   <link rel="stylesheet" href="/static/style.css">
   <link rel="icon" type="image/svg+xml" href="/static/cat.svg">
+  {{if .User}}<meta name="session-timeout" content="{{.SessionTimeout}}">{{end}}
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>

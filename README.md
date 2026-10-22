@@ -345,7 +345,10 @@ The application implements the usual defences for a cookie based web app:
   without a request (30 minutes by default). Every request moves the expiry
   forward, and the cookie is written again with the same date, so the browser
   and the server always agree on when the visitor is signed out. An expired
-  session is deleted and the sign in page explains the timeout.
+  session is deleted and the sign in page explains the timeout. A signed in
+  page quietly sends a keep-alive when the visitor clicks, types or changes a
+  field (at most every five minutes), so a long form is not cut off while the
+  visitor is working; an untouched tab still times out.
 * **Session fixation** is prevented by rotating the session id after every
   successful login and after a password change.
 * **CSRF**: every session carries a token that must be sent back in the
@@ -370,6 +373,7 @@ The application implements the usual defences for a cookie based web app:
 | `GET` | `/login`, `/register` | everybody |
 | `POST` | `/login`, `/register` | everybody |
 | `POST` | `/logout` | signed in |
+| `POST` | `/session/touch` | signed in |
 | `GET` | `/` | signed in |
 | `GET` | `/lessons/{id}` | signed in |
 | `GET` | `/lessons/{id}/quiz` | signed in |

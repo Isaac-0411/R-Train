@@ -107,6 +107,8 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, page
 		}
 	}
 	data["User"] = user
+	// The page needs the idle timeout for its quiet keep-alive request.
+	data["SessionTimeout"] = int(s.cfg.SessionTTL.Seconds())
 	data["CurrentPath"] = r.URL.Path
 	if _, ok := data["Title"]; !ok {
 		data["Title"] = "Reading Trainer"

@@ -78,6 +78,7 @@ func (s *Server) routes() http.Handler {
 	// to the not found handler below.
 	mux.Handle("GET /{$}", protected(s.handleLanding))
 	mux.Handle("POST /logout", protected(s.handleLogout))
+	mux.Handle("POST /session/touch", protected(s.handleSessionTouch))
 	mux.Handle("GET /lessons/{id}", protected(s.handleLessonText))
 	mux.Handle("GET /lessons/{id}/quiz", protected(s.handleQuiz))
 	mux.Handle("POST /lessons/{id}/submit", protected(s.handleSubmit))
@@ -154,6 +155,16 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	}
 	s.sessions.ClearCookie(w)
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
+
+// handleSessionTouch restarts the idle timeout of the current session.
+//
+// A signed in page sends this request when the visitor interacts with it, so
+// a long form (like a quiz) is not cut off by the timeout while the visitor
+// is working. The session middleware has already extended the session by the
+// time this handler runs, so there is nothing left to do.
+func (s *Server) handleSessionTouch(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // logout ends the session of the visitor and sends them to the login page.

@@ -321,6 +321,57 @@
     renumber();
   }
 
+  /* ------------------------------------------------------- session timeout */
+
+  // A quiet keep-alive: while a signed in page is open, real interaction
+  // (a click, a key press, a changed field) asks the server to restart the
+  // idle clock. A learner who is working through a quiz is therefore never
+  // signed out in the middle of it, while an abandoned tab still times out.
+  function initSessionKeepAlive() {
+    var meta = document.querySelector('meta[name="session-timeout"]');
+    if (!meta) return;
+
+    var ttl = parseInt(meta.getAttribute("content"), 10);
+    if (!ttl || ttl <= 0) return;
+
+    var tokenInput = document.querySelector('input[name="csrf_token"]');
+    if (!tokenInput) return;
+
+    // At most every five minutes, but a third of the timeout when that is
+    // shorter (a test or a deliberately strict installation).
+    var interval = Math.min(5 * 60, Math.max(30, ttl / 3)) * 1000;
+    var last = 0;
+    var busy = false;
+
+    function touch() {
+      var now = Date.now();
+      if (busy || now - last < interval) return;
+      last = now;
+      busy = true;
+
+      var body = new URLSearchParams();
+      body.set("csrf_token", tokenInput.value);
+
+      fetch("/session/touch", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: body.toString(),
+        credentials: "same-origin",
+        keepalive: true,
+      })
+        .catch(function () {
+          // The next real request reports a timeout; nothing to do here.
+        })
+        .then(function () {
+          busy = false;
+        });
+    }
+
+    ["pointerdown", "keydown", "change"].forEach(function (name) {
+      document.addEventListener(name, touch, { passive: true, capture: true });
+    });
+  }
+
   /* ----------------------------------------------------------------- boot */
 
   function boot() {
@@ -330,6 +381,7 @@
     initConfirmations();
     initValidation();
     initThemeToggle();
+    initSessionKeepAlive();
   }
 
   if (document.readyState === "loading") {
