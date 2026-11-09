@@ -14,6 +14,10 @@
         if (theme === "light" || theme === "dark") {
           document.documentElement.setAttribute("data-theme", theme);
         }
+        var readingSize = window.localStorage.getItem("reading-size");
+        if (readingSize === "large" || readingSize === "larger") {
+          document.documentElement.setAttribute("data-reading-size", readingSize);
+        }
       } catch (error) {
         /* No storage available, the system setting is used. */
       }
@@ -41,12 +45,12 @@
           <path d="M3.2 12.3 5.1 12.8M20.8 12.3 18.9 12.8"/>
         </svg>
       </span>
-      <span class="brand-text">Reading Trainer</span>
+      <span class="brand-text">Reading Trainer<span class="brand-caption">A space to learn</span></span>
     </a>
 
     <nav class="nav" aria-label="Main navigation">
-      <a href="/" class="nav-link{{if eq .CurrentPath "/"}} is-active{{end}}">Lessons</a>
-      <a href="/results" class="nav-link{{if eq .CurrentPath "/results"}} is-active{{end}}">My results</a>
+      <a href="/" class="nav-link{{if or (eq .CurrentPath "/") (hasPrefix .CurrentPath "/lessons/")}} is-active{{end}}">Lessons</a>
+      <a href="/results" class="nav-link{{if hasPrefix .CurrentPath "/results"}} is-active{{end}}">My results</a>
       {{if .User}}
         <a href="/account" class="nav-link{{if eq .CurrentPath "/account"}} is-active{{end}}">Account</a>
       {{end}}
@@ -82,10 +86,25 @@
 </main>
 
 <footer class="footer">
-  <p>Reading Trainer · Myanmar reading practice</p>
+  <p>Reading Trainer <span aria-hidden="true">·</span> A little practice, at your own pace.</p>
 </footer>
 
 <script src="/static/app.js" defer></script>
 </body>
 </html>
+{{end}}
+
+{{define "study-tools"}}
+<div class="study-toolbar" data-study-tools hidden>
+  <span class="study-toolbar-label">Make yourself comfortable</span>
+  <div class="study-controls">
+    <div class="text-size-controls" role="group" aria-label="Reading text size">
+      <span class="text-size-label">Text size</span>
+      <button type="button" class="text-size-btn" data-reading-size="normal" aria-label="Standard text size" aria-pressed="true">A</button>
+      <button type="button" class="text-size-btn text-size-large" data-reading-size="large" aria-label="Large text size" aria-pressed="false">A</button>
+      <button type="button" class="text-size-btn text-size-larger" data-reading-size="larger" aria-label="Extra large text size" aria-pressed="false">A</button>
+    </div>
+    <button type="button" class="btn btn-ghost btn-small focus-toggle" id="focusToggle" aria-pressed="false">Focus view</button>
+  </div>
+</div>
 {{end}}

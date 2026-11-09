@@ -1,8 +1,12 @@
 {{define "content"}}
-<div class="page-head">
+<div class="page-head study-page-head">
   <a class="back-link" href="/lessons/{{.Lesson.ID}}">← Back to the text</a>
+  <ol class="study-steps" aria-label="Lesson steps"><li class="is-complete"><span>1</span> Read</li><li aria-current="step"><span>2</span> Practice</li><li><span>3</span> Review</li></ol>
   <h1 class="page-title">{{.Lesson.Title}}</h1>
+  <p class="muted">One question at a time. Refer to the passage whenever you need.</p>
 </div>
+
+{{template "study-tools" .}}
 
 {{if .Message}}
   <div class="alert alert-error" role="alert">{{.Message}}</div>
@@ -13,8 +17,8 @@
 
   <div class="quiz-layout">
     <section class="passage-panel card">
-      <h2 class="panel-title">Japanese text</h2>
-      <div class="passage passage-jp" lang="ja">{{.QuizText}}</div>
+      <div class="reading-heading"><h2 class="panel-title">{{if .TextFallback}}Myanmar text{{else}}Japanese text{{end}}</h2><span class="reading-note">Your reference</span></div>
+      <div class="passage passage-jp" lang="{{if .TextFallback}}my{{else}}ja{{end}}">{{.QuizText}}</div>
       {{if .TextFallback}}
         <p class="field-hint">This lesson has no Japanese text yet, so the Myanmar text is shown here.</p>
       {{end}}
@@ -29,10 +33,14 @@
             <button type="button" class="btn btn-icon" id="nextBox" aria-label="Next question">›</button>
           </div>
         </div>
-        <div class="quiz-progress" id="boxProgress" role="progressbar" aria-label="Question progress"
-             aria-valuemin="1" aria-valuemax="{{.Total}}" aria-valuenow="1">
-          <span class="quiz-progress-bar" id="boxProgressBar" style="width: {{percent 1 .Total}}%"></span>
+        <p class="answer-count" id="answerCount" role="status">0 of {{.Total}} answered</p>
+        <div class="quiz-progress" id="boxProgress" role="progressbar" aria-label="Answer progress"
+             aria-valuemin="0" aria-valuemax="{{.Total}}" aria-valuenow="0">
+          <span class="quiz-progress-bar" id="boxProgressBar" style="width: 0%"></span>
         </div>
+        <nav class="question-map" aria-label="Jump to a question" hidden>
+          {{range .Boxes}}<button type="button" class="question-jump" data-question-index="{{.Index}}" aria-label="Question {{.Number}}, unanswered"{{if eq .Index 0}} aria-current="step"{{end}}>{{.Number}}</button>{{end}}
+        </nav>
       </div>
 
       {{range $box := .Boxes}}
@@ -41,7 +49,7 @@
             <fieldset class="question">
               <legend class="question-legend">
                 <span class="question-number">{{add $box.From $offset}}</span>
-                <span class="question-text">{{$question.Prompt}}</span>
+                <span class="question-text" tabindex="-1">{{$question.Prompt}}</span>
               </legend>
               <div class="options">
                 {{range $optionIndex, $option := $question.Options}}
@@ -59,10 +67,14 @@
       {{end}}
 
       <div class="quiz-footer">
-        <span class="quiz-hint" id="quizHint"></span>
-        <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">Submit</button>
+        <span class="quiz-hint" id="quizHint" role="status"></span>
+        <div class="quiz-actions">
+          <button type="button" class="btn btn-primary" id="nextQuestion" hidden>Next question <span aria-hidden="true">→</span></button>
+          <button type="submit" class="btn btn-primary" id="submitBtn">Check answers</button>
+        </div>
       </div>
     </section>
   </div>
 </form>
+<noscript><style>.qbox[hidden] { display: flex !important; } .quiz-head { display: none; }</style><p class="field-hint">All questions are shown below the passage. Answer each one, then choose Check answers.</p></noscript>
 {{end}}

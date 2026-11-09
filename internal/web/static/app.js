@@ -21,7 +21,33 @@
     var hint = document.getElementById("quizHint");
     var progress = document.getElementById("boxProgress");
     var progressBar = document.getElementById("boxProgressBar");
+    var answerCount = document.getElementById("answerCount");
+    var questionMap = form.querySelector(".question-map");
+    var jumps = Array.prototype.slice.call(form.querySelectorAll("[data-question-index]"));
+    var nextQuestion = document.getElementById("nextQuestion");
+    var submitBtn = document.getElementById("submitBtn");
     var current = 0;
+
+    if (questionMap) questionMap.hidden = false;
+
+    function updateAnswers() {
+      var answered = 0;
+      boxes.forEach(function (box, i) {
+        var complete = !!box.querySelector("input[type=radio]:checked");
+        if (complete) answered++;
+        if (jumps[i]) {
+          jumps[i].classList.toggle("is-answered", complete);
+          jumps[i].setAttribute("aria-label", "Question " + (i + 1) + (complete ? ", answered" : ", unanswered"));
+        }
+      });
+      if (answerCount) answerCount.textContent = answered + " of " + boxes.length + " answered";
+      if (progress) {
+        progress.setAttribute("aria-valuenow", String(answered));
+        progress.setAttribute("aria-valuetext", answered + " of " + boxes.length + " answered");
+      }
+      if (progressBar) progressBar.style.width = (answered / boxes.length * 100) + "%";
+      return answered;
+    }
 
     // The arrow buttons move through the questions. The page only scrolls
     // when the question card is not on the screen, so the text can be read
@@ -39,7 +65,8 @@
 
       var top = rect.top + window.pageYOffset - margin;
       if (top < 0) top = 0;
-      window.scrollTo({ top: top, behavior: "smooth" });
+      var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      window.scrollTo({ top: top, behavior: reduceMotion ? "instant" : "smooth" });
     }
 
     function showBox(index, scroll) {
@@ -54,25 +81,39 @@
       });
 
       if (label) label.textContent = "Question " + (index + 1) + " of " + boxes.length;
-      if (progress) {
-        progress.setAttribute("aria-valuemax", String(boxes.length));
-        progress.setAttribute("aria-valuenow", String(index + 1));
-        progress.setAttribute("aria-valuetext", "Question " + (index + 1) + " of " + boxes.length);
-      }
-      if (progressBar) progressBar.style.width = ((index + 1) / boxes.length * 100) + "%";
       if (prevBtn) prevBtn.disabled = index === 0;
       if (nextBtn) nextBtn.disabled = index === boxes.length - 1;
+      if (nextQuestion) nextQuestion.hidden = index === boxes.length - 1;
+      if (submitBtn) {
+        submitBtn.classList.toggle("btn-ghost", index !== boxes.length - 1);
+        submitBtn.classList.toggle("btn-primary", index === boxes.length - 1);
+      }
+      jumps.forEach(function (jump, i) {
+        if (i === index) jump.setAttribute("aria-current", "step");
+        else jump.removeAttribute("aria-current");
+      });
 
-      if (scroll) ensureQuestionVisible(boxes[index]);
+      if (scroll) {
+        ensureQuestionVisible(boxes[index]);
+        var prompt = boxes[index].querySelector(".question-text");
+        if (prompt) prompt.focus({ preventScroll: true });
+      }
     }
 
     if (prevBtn) prevBtn.addEventListener("click", function () { showBox(current - 1, true); });
     if (nextBtn) nextBtn.addEventListener("click", function () { showBox(current + 1, true); });
+    if (nextQuestion) nextQuestion.addEventListener("click", function () { showBox(current + 1, true); });
+    jumps.forEach(function (jump) {
+      jump.addEventListener("click", function () {
+        showBox(Number(jump.getAttribute("data-question-index")), true);
+      });
+    });
 
     document.addEventListener("keydown", function (event) {
-      if (event.target && /^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName)) return;
-      if (event.key === "ArrowLeft") { showBox(current - 1, true); }
-      if (event.key === "ArrowRight") { showBox(current + 1, true); }
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      if (event.target && (/^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(event.target.tagName) || event.target.isContentEditable)) return;
+      if (event.key === "ArrowLeft") { event.preventDefault(); showBox(current - 1, true); }
+      if (event.key === "ArrowRight") { event.preventDefault(); showBox(current + 1, true); }
     });
 
     // Answer every question before the form may be submitted.
@@ -117,9 +158,56 @@
     form.addEventListener("change", function (event) {
       var question = event.target.closest ? event.target.closest(".question") : null;
       if (question) question.classList.remove("is-missing");
+      var answered = updateAnswers();
+      if (hint && hint.classList.contains("is-error")) {
+        hint.textContent = answered === boxes.length ? "All answered. Ready to check your answers." : (boxes.length - answered) + " questions still need an answer.";
+        hint.classList.toggle("is-error", answered !== boxes.length);
+      }
     });
 
     showBox(0, false);
+    // Browsers may restore radio selections when returning to a quiz.
+    updateAnswers();
+    window.addEventListener("pageshow", updateAnswers);
+  }
+
+  /* --------------------------------------------------------- reading tools */
+
+  function initStudyTools() {
+    var toolbar = document.querySelector("[data-study-tools]");
+    if (!toolbar) return;
+    toolbar.hidden = false;
+
+    var sizes = toolbar.querySelectorAll("[data-reading-size]");
+    function paintSize(size) {
+      document.documentElement.setAttribute("data-reading-size", size);
+      sizes.forEach(function (button) {
+        button.setAttribute("aria-pressed", String(button.getAttribute("data-reading-size") === size));
+      });
+    }
+    paintSize(document.documentElement.getAttribute("data-reading-size") || "normal");
+    sizes.forEach(function (button) {
+      button.addEventListener("click", function () {
+        var size = button.getAttribute("data-reading-size");
+        paintSize(size);
+        try { window.localStorage.setItem("reading-size", size); } catch (error) { /* Use this size for the current page. */ }
+      });
+    });
+
+    var focus = document.getElementById("focusToggle");
+    if (focus) {
+      function paintFocus(active) {
+        document.body.classList.toggle("study-focus", active);
+        focus.setAttribute("aria-pressed", String(active));
+        focus.textContent = active ? "Exit focus view" : "Focus view";
+      }
+      try { paintFocus(window.sessionStorage.getItem("study-focus") === "true"); } catch (error) { /* Start with the regular view. */ }
+      focus.addEventListener("click", function () {
+        var active = !document.body.classList.contains("study-focus");
+        paintFocus(active);
+        try { window.sessionStorage.setItem("study-focus", String(active)); } catch (error) { /* Keep the current view. */ }
+      });
+    }
   }
 
   /* ---------------------------------------------------------- dark mode */
@@ -145,6 +233,8 @@
     }
 
     function currentTheme() {
+      var applied = document.documentElement.getAttribute("data-theme");
+      if (applied === "light" || applied === "dark") return applied;
       var theme = storedTheme();
       if (theme === "light" || theme === "dark") return theme;
       return systemTheme();
@@ -385,6 +475,7 @@
   /* ----------------------------------------------------------------- boot */
 
   function boot() {
+    initStudyTools();
     initQuiz();
     initOptionEditor();
     initPasswordToggles();

@@ -16,10 +16,10 @@ managed by administrators in the browser.
 | Step | Page | What happens |
 | --- | --- | --- |
 | 1 | `/login`, `/register` | A visitor signs in or creates a normal account. |
-| 2 | `/` | The landing page shows one button per lesson. |
-| 3 | `/lessons/{id}` | The **Myanmar language page**: the Myanmar text of the lesson in a box and a **Next** button. |
-| 4 | `/lessons/{id}/quiz` | The **question page**: the big text box with the Japanese text of the lesson stands on top, one question per card is shown below it. Arrow buttons move from question to question, the page scrolls normally with the content. The **Submit** button sits in the bottom right corner. |
-| 5 | `/results/{id}` | The **result page**: the score such as `4 / 20`, the answers and a **Home** button back to the landing page. |
+| 2 | `/` | The study space introduces the practice flow and shows a card for each lesson. |
+| 3 | `/lessons/{id}` | The **Myanmar language page** shows the passage and a **Start practice** button. |
+| 4 | `/lessons/{id}/quiz` | The **question page** shows the reference passage beside the questions on wider screens and above them on smaller screens. Learners answer one question at a time, use arrows or numbered buttons to move between questions, and choose **Check answers** to submit. |
+| 5 | `/results/{id}` | The **result page** shows the score such as `4 / 20`, an answer review, and links to read again or explore lessons. |
 
 Every lesson has **two texts** and they are written by hand:
 
@@ -37,6 +37,19 @@ question has while writing it.
 
 The language of the website itself is English, the content of the lessons and
 questions is written by the administrator in the language they want.
+
+### Comfortable studying
+
+The reading and practice pages offer three text sizes; the choice is saved
+in the browser. **Focus view** hides the main navigation and account actions
+while studying and stays active between reading and practice in the current
+tab. Choose **Exit focus view** to bring them back.
+
+Quiz progress counts answered questions. Numbered buttons distinguish answered
+questions and mark the current question; learners can revisit any question
+before submitting. Missing answers are highlighted, and submission takes the
+learner to the first unanswered question. With JavaScript disabled, all
+questions are displayed together and the server still validates answers.
 
 ---
 
@@ -164,8 +177,9 @@ make dev-seed
 description and **two texts**:
 
 * **Myanmar text** — the passage the learner reads on the lesson page.
-* **Japanese text** — the text that stands above the questions on the question
-  page. When it is left empty, the Myanmar text is used instead.
+* **Japanese text** — the reference passage shown alongside the questions
+  (above them on small screens). When it is left empty, the Myanmar text is
+  used instead.
 
 Both texts and all the questions are written by hand, nothing is generated.
 The questions belong to the lesson and are written in the same page.
@@ -295,7 +309,7 @@ for local development.
 
    Do not set `ADDR`, `PORT` or `DB_PATH`; Vercel provides `PORT` and the
    database URL replaces the SQLite file.
-3. Deploy and open `/healthz`. Migrations run on the first request and are
+3. Deploy and open `/health`. Migrations run on the first request and are
    protected by a PostgreSQL advisory lock, so concurrent cold starts are
    safe.
 4. Sign in, change the bootstrap password, then delete `ADMIN_PASSWORD` from
@@ -427,7 +441,23 @@ The application implements the usual defences for a cookie based web app:
 | `POST` | `/admin/users`, `/admin/users/{id}/…` | administrator, main administrator for roles |
 | `POST` | `/admin/lessons`, `/admin/lessons/{id}/…` | administrator |
 | `POST` | `/admin/questions/{id}/…` | administrator |
-| `GET` | `/healthz` | everybody |
+| `GET`, `HEAD` | `/health`, `/healthz` | everybody |
+
+### Health endpoint
+
+`GET /health` is a public readiness check. It pings the database with a
+two-second timeout and returns `200 OK` with `{"status":"ok"}` when the
+application can reach its database, or `503 Service Unavailable` with
+`{"status":"unavailable"}` otherwise. Responses are JSON and are never
+cached. Probes do not create or refresh browser sessions.
+
+`HEAD /health` returns the same status without a body. The existing
+`/healthz` endpoint remains available with its plain text `ok` response for
+container health checks.
+
+```bash
+curl --fail http://localhost:8080/health
+```
 
 ---
 

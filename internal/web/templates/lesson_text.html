@@ -1,17 +1,20 @@
 {{define "content"}}
-<div class="page-head">
+<div class="page-head study-page-head">
   <a class="back-link" href="/">← All lessons</a>
+  <ol class="study-steps" aria-label="Lesson steps"><li aria-current="step"><span>1</span> Read</li><li><span>2</span> Practice</li><li><span>3</span> Review</li></ol>
   <h1 class="page-title">{{.Lesson.Title}}</h1>
   {{if .Lesson.Summary}}<p class="muted">{{.Lesson.Summary}}</p>{{end}}
 </div>
 
-<section class="card reading-card">
-  <h2 class="panel-title">Myanmar text</h2>
+{{template "study-tools" .}}
+
+<section class="card reading-card" aria-labelledby="passageTitle">
+  <div class="reading-heading"><h2 class="panel-title" id="passageTitle">Myanmar text</h2><span class="reading-note">Read at your own pace</span></div>
   <div class="passage" lang="my">{{.Lesson.Passage}}</div>
 </section>
 
-<div class="page-actions">
-  <span class="muted">{{.QuestionCount}} question{{if ne .QuestionCount 1}}s{{end}} in this lesson</span>
-  <a class="btn btn-primary btn-lg" href="/lessons/{{.Lesson.ID}}/quiz">Next →</a>
+<div class="page-actions reading-actions">
+  <div><strong>Ready to practice?</strong><p class="muted">{{.QuestionCount}} question{{if ne .QuestionCount 1}}s{{end}} to check your understanding. You can return to the text anytime.</p></div>
+  <a class="btn btn-primary btn-lg" href="/lessons/{{.Lesson.ID}}/quiz">Start practice <span aria-hidden="true">→</span></a>
 </div>
 {{end}}

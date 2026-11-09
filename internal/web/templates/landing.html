@@ -1,23 +1,38 @@
 {{define "content"}}
-<div class="page-head">
-  <h1 class="page-title">Lessons</h1>
-  <p class="muted">Pick a lesson and read the Myanmar text first.</p>
+<section class="study-welcome" aria-labelledby="welcomeTitle">
+  <div class="welcome-copy">
+    <p class="eyebrow">Your study space</p>
+    <h1 id="welcomeTitle">A little reading,<br>every day.</h1>
+    <p class="welcome-description">Make room for a moment of learning. Read a Myanmar passage, check your understanding, and keep growing at your own pace.</p>
+    <a href="#lessons" class="btn btn-primary">Find a lesson <span aria-hidden="true">↓</span></a>
+  </div>
+  <ol class="study-routine" aria-label="How to practice">
+    <li><span class="routine-number" aria-hidden="true">01</span><div><h2>Read with attention</h2><p>Take your time with the Myanmar passage.</p></div></li>
+    <li><span class="routine-number" aria-hidden="true">02</span><div><h2>Check your understanding</h2><p>Work through one question at a time.</p></div></li>
+    <li><span class="routine-number" aria-hidden="true">03</span><div><h2>Learn from your answers</h2><p>Review, revisit, and try again whenever you like.</p></div></li>
+  </ol>
+</section>
+
+<div class="section-head" id="lessons">
+  <div><p class="eyebrow">Keep your curiosity going</p><h2 class="page-title">Your lessons</h2></div>
+  <span class="lesson-count">{{len .Lessons}} lesson{{if ne (len .Lessons) 1}}s{{end}} to explore</span>
 </div>
 
 {{if .Lessons}}
   <div class="lesson-grid">
     {{range $index, $lesson := .Lessons}}
       <a class="lesson-card" href="/lessons/{{$lesson.ID}}">
-        <span class="lesson-number">Lesson {{add $index 1}}</span>
+        <span class="lesson-card-top"><span class="lesson-number">Lesson {{add $index 1}}</span><span class="lesson-card-symbol" aria-hidden="true">↗</span></span>
         <span class="lesson-title">{{$lesson.Title}}</span>
         {{if $lesson.Summary}}<span class="lesson-summary">{{$lesson.Summary}}</span>{{end}}
-        <span class="lesson-meta">{{$lesson.QuestionCount}} question{{if ne $lesson.QuestionCount 1}}s{{end}}</span>
+        <span class="lesson-card-footer"><span class="lesson-meta">{{$lesson.QuestionCount}} question{{if ne $lesson.QuestionCount 1}}s{{end}}</span><span class="lesson-open">Start reading <span aria-hidden="true">→</span></span></span>
       </a>
     {{end}}
   </div>
 {{else}}
   <div class="card empty-state">
-    <p>No lessons have been published yet.</p>
+    <h3>Your next chapter is on its way.</h3>
+    <p>No lessons have been published yet. Check back soon for something to read.</p>
     {{if and .User .User.IsAdmin}}
       <a class="btn btn-primary" href="/admin/lessons/new">Create the first lesson</a>
     {{end}}

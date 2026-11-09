@@ -66,9 +66,6 @@ func (s *Server) routes() http.Handler {
 		mux.Handle("GET /static/", http.StripPrefix("/static/", fileServer))
 	}
 
-	// --- health check -----------------------------------------------------
-	mux.HandleFunc("GET /healthz", s.handleHealth)
-
 	// --- pages that require a signed in user -------------------------------
 	protected := func(h http.HandlerFunc) http.Handler {
 		return middleware.Chain(h, middleware.RequireAuth("/login"))
@@ -120,29 +117,56 @@ func (s *Server) routes() http.Handler {
 	// --- catch all ---------------------------------------------------------
 	mux.HandleFunc("/", s.handleNotFound)
 
+	// Probes bypass browser sessions and CSRF so that monitoring never creates
+	// or extends a session, even when the database is unavailable.
+	public := http.NewServeMux()
+	public.HandleFunc("/health", s.handleHealth)
+	public.HandleFunc("/healthz", s.handleHealth)
+	public.Handle("/", middleware.Chain(mux,
+		s.sessions.Load,
+		s.sessions.CSRF(s.renderError),
+	))
+
 	// --- middleware chain --------------------------------------------------
-	return middleware.Chain(mux,
+	return middleware.Chain(public,
 		middleware.Recoverer(s.logger, s.renderError),
 		middleware.Logger(s.logger),
 		middleware.SecurityHeaders(s.cfg.DevMode),
-		s.sessions.Load,
-		s.sessions.CSRF(s.renderError),
 		middleware.NoStore,
 	)
 }
 
-// handleHealth answers readiness probes.
+// handleHealth answers readiness probes. /health is JSON; /healthz keeps
+// the plain text response used by existing deployments.
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
-	defer cancel()
-
-	if err := s.store.DB().PingContext(ctx); err != nil {
-		http.Error(w, "database unavailable", http.StatusServiceUnavailable)
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		w.Header().Set("Allow", "GET, HEAD")
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("ok"))
+
+	// Leave room for the HTTP response within a three-second container probe.
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+
+	status := http.StatusOK
+	body := "{\"status\":\"ok\"}\n"
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	if err := s.store.DB().PingContext(ctx); err != nil {
+		status = http.StatusServiceUnavailable
+		body = "{\"status\":\"unavailable\"}\n"
+	}
+	if r.URL.Path == "/healthz" {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		body = "ok"
+		if status != http.StatusOK {
+			body = "database unavailable\n"
+		}
+	}
+	w.WriteHeader(status)
+	if r.Method != http.MethodHead {
+		w.Write([]byte(body))
+	}
 }
 
 // handleLogout signs the user out and clears the session cookie.

@@ -1,29 +1,38 @@
 {{define "content"}}
 <div class="result-wrap">
+  <div class="page-head">
+    <a class="back-link" href="/results">← My results</a>
+    <p class="eyebrow">Step 3 · Review</p>
+    <h1 class="page-title">Every answer is a chance to learn.</h1>
+  </div>
   <section class="card result-card">
-    <p class="result-label">Your result</p>
+    <h2 class="result-label">Your result</h2>
     <p class="result-score">{{.Attempt.Score}} / {{.Attempt.Total}}</p>
-    <p class="result-percent">{{percent .Attempt.Score .Attempt.Total}}%</p>
+    <p class="result-percent">{{percent .Attempt.Score .Attempt.Total}}% correct</p>
+
+    <p class="result-feedback">{{if eq .Attempt.Score .Attempt.Total}}You answered every question correctly. Keep building your reading habit.{{else}}Take a moment to review your answers, then revisit the passage at your own pace.{{end}}</p>
 
     <p class="result-meta">
       {{.Attempt.LessonTitle}} · {{formatDate .Attempt.SubmittedAt}}
     </p>
 
     <div class="result-actions">
-      <a class="btn btn-primary btn-lg" href="/">Home</a>
-      <a class="btn btn-ghost" href="/results">All my results</a>
       {{if .Attempt.LessonID}}
-        <a class="btn btn-ghost" href="/lessons/{{.Attempt.LessonID}}">Read again</a>
+        <a class="btn btn-primary btn-lg" href="/lessons/{{.Attempt.LessonID}}">Read again</a>
       {{end}}
+      <a class="btn{{if .Attempt.LessonID}} btn-ghost{{else}} btn-primary btn-lg{{end}}" href="/">Explore lessons</a>
+      <a class="btn btn-ghost" href="/results">All my results</a>
     </div>
   </section>
 
   {{if .Attempt.Answers}}
     <section class="card">
       <h2 class="panel-title">Answer review</h2>
+      <p class="muted review-intro">Compare each answer with the passage. Focus on the details you can use next time.</p>
       <ol class="review-list">
         {{range .Attempt.Answers}}
           <li class="review-item{{if .IsCorrect}} is-correct{{else}} is-wrong{{end}}">
+            <p class="review-status"><span class="badge{{if .IsCorrect}} badge-success{{else}} badge-muted{{end}}">{{if .IsCorrect}}Correct{{else}}Needs review{{end}}</span></p>
             <p class="review-question">{{.Prompt}}</p>
             <p class="review-answer">
               Your answer:

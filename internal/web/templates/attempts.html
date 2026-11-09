@@ -1,7 +1,9 @@
 {{define "content"}}
 <div class="page-head">
+  <p class="eyebrow">Your learning journal</p>
   <h1 class="page-title">My results</h1>
-  <p class="muted">Every result you submitted is stored here.</p>
+  <p class="muted">Look back at your practice and choose a lesson to revisit.</p>
+  <a class="btn btn-ghost" href="/">Browse lessons →</a>
 </div>
 
 <div class="stat-row">
@@ -12,10 +14,12 @@
 </div>
 
 {{if .Attempts}}
+  <h2 class="panel-title section-heading">Practice history</h2>
   <section class="card table-card">
     <table class="table">
+      <caption class="sr-only">Your submitted lessons, scores, and answer reviews</caption>
       <thead>
-        <tr><th>Lesson</th><th>Score</th><th>Result</th><th>Submitted</th><th></th></tr>
+        <tr><th scope="col">Lesson</th><th scope="col">Score</th><th scope="col">Result</th><th scope="col">Submitted</th><th scope="col"><span class="sr-only">Answer review</span></th></tr>
       </thead>
       <tbody>
         {{range .Attempts}}
@@ -24,7 +28,7 @@
             <td><strong>{{.Score}} / {{.Total}}</strong></td>
             <td><span class="badge{{if .Passed}} badge-success{{else}} badge-muted{{end}}">{{if .Passed}}Passed{{else}}Not passed{{end}}</span></td>
             <td class="muted">{{formatDate .SubmittedAt}}</td>
-            <td class="table-actions"><a class="btn btn-small btn-ghost" href="/results/{{.ID}}">Details</a></td>
+            <td class="table-actions"><a class="btn btn-small btn-ghost" href="/results/{{.ID}}" aria-label="Review answers for {{.LessonTitle}}">Review answers</a></td>
           </tr>
         {{end}}
       </tbody>
@@ -32,8 +36,9 @@
   </section>
 {{else}}
   <div class="card empty-state">
-    <p>You have not submitted a lesson yet.</p>
-    <a class="btn btn-primary" href="/">Go to the lessons</a>
+    <h2 class="panel-title">Your practice starts with one passage.</h2>
+    <p class="muted">Complete a lesson to save your first result and review what you learned.</p>
+    <a class="btn btn-primary" href="/">Find a lesson</a>
   </div>
 {{end}}
 {{end}}
